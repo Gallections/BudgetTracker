@@ -1,9 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   SafeAreaView, ActivityIndicator, FlatList, ScrollView,
 } from 'react-native';
+import { Colors } from '../../constants/colors';
+import { useTheme } from '../../hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { SavingsAccount, getSavingsAccounts, softDeleteSavingsAccount, updateSavingsOrder } from '../../db/savings';
 import { Transaction, getTransactions } from '../../db/transactions';
@@ -26,6 +28,8 @@ const INCOME_PERIODS: { key: Period; label: string }[] = [
 
 export default function SavingsScreen() {
   const { state, dispatch } = useApp();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
   const [incomeTransactions, setIncomeTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +207,7 @@ export default function SavingsScreen() {
   );
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#2563EB" /></View>;
+    return <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
 
   return (
@@ -244,94 +248,79 @@ export default function SavingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  totalCard: {
-    backgroundColor: '#059669', margin: 16, borderRadius: 16,
-    padding: 20, alignItems: 'center',
-  },
-  totalLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
-  totalAmount: { color: 'white', fontSize: 32, fontWeight: '700' },
-
-  sectionHeader: {
-    fontSize: 16, fontWeight: '700', color: '#111827',
-    marginHorizontal: 16, marginBottom: 8,
-  },
-
-  inlineEmpty: { paddingHorizontal: 16, paddingVertical: 12 },
-  inlineEmptyText: { fontSize: 14, color: '#9CA3AF' },
-
-  // Accounts list rows
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'white', paddingLeft: 16, paddingRight: 8, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-  },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 8 },
-  rowLeft: { flex: 1 },
-  accountName: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  institution: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  typeBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#ECFDF5',
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 4,
-  },
-  typeBadgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
-  balance: { fontSize: 16, fontWeight: '600', color: '#111827', marginLeft: 8 },
-  rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
-  orderBtn: { padding: 4 },
-  orderBtnDisabled: { opacity: 0.3 },
-  deleteBtn: { padding: 4, marginTop: 4 },
-
-  // Period selector
-  periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
-  periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  periodChip: {
-    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'white',
-  },
-  periodChipActive: { backgroundColor: '#059669', borderColor: '#059669' },
-  periodChipText: { fontSize: 14, color: '#374151' },
-  periodChipTextActive: { color: 'white', fontWeight: '600' },
-
-  // Income card
-  incomeCard: {
-    backgroundColor: 'white', marginHorizontal: 16, marginBottom: 8,
-    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E5E7EB',
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  incomeLabel: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
-  incomeAmount: { fontSize: 20, fontWeight: '700', color: '#059669' },
-
-  // Income transaction rows
-  txRow: {
-    flexDirection: 'row', backgroundColor: 'white',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  txLeft: { flex: 1 },
-  txMerchant: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  txMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: {
-    backgroundColor: '#ECFDF5', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
-  badgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
-  txDate: { fontSize: 12, color: '#9CA3AF' },
-  txAmount: { fontSize: 15, fontWeight: '600', color: '#059669' },
-
-  // Empty state (income list)
-  empty: { alignItems: 'center', gap: 8, paddingTop: 24, paddingBottom: 24 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  emptySub: { fontSize: 14, color: '#9CA3AF' },
-
-  fab: {
-    position: 'absolute', bottom: 32, right: 24,
-    backgroundColor: '#059669', width: 56, height: 56,
-    borderRadius: 28, justifyContent: 'center', alignItems: 'center',
-    elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2, shadowRadius: 4,
-  },
-});
+function makeStyles(c: typeof Colors.light) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background },
+    totalCard: {
+      backgroundColor: '#059669', margin: 16, borderRadius: 16,
+      padding: 20, alignItems: 'center',
+    },
+    totalLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
+    totalAmount: { color: 'white', fontSize: 32, fontWeight: '700' },
+    sectionHeader: {
+      fontSize: 16, fontWeight: '700', color: c.text,
+      marginHorizontal: 16, marginBottom: 8,
+    },
+    inlineEmpty: { paddingHorizontal: 16, paddingVertical: 12 },
+    inlineEmptyText: { fontSize: 14, color: c.textSecondary },
+    row: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: c.surface, paddingLeft: 16, paddingRight: 8, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 8 },
+    rowLeft: { flex: 1 },
+    accountName: { fontSize: 16, fontWeight: '600', color: c.text },
+    institution: { fontSize: 13, color: c.textSecondary, marginTop: 2 },
+    typeBadge: {
+      alignSelf: 'flex-start', backgroundColor: '#ECFDF5',
+      borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 4,
+    },
+    typeBadgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
+    balance: { fontSize: 16, fontWeight: '600', color: c.text, marginLeft: 8 },
+    rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
+    orderBtn: { padding: 4 },
+    orderBtnDisabled: { opacity: 0.3 },
+    deleteBtn: { padding: 4, marginTop: 4 },
+    periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
+    periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+    periodChip: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: c.surface,
+    },
+    periodChipActive: { backgroundColor: '#059669', borderColor: '#059669' },
+    periodChipText: { fontSize: 14, color: c.text },
+    periodChipTextActive: { color: 'white', fontWeight: '600' },
+    incomeCard: {
+      backgroundColor: c.surface, marginHorizontal: 16, marginBottom: 8,
+      borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    incomeLabel: { fontSize: 15, color: c.textSecondary, fontWeight: '500' },
+    incomeAmount: { fontSize: 20, fontWeight: '700', color: '#059669' },
+    txRow: {
+      flexDirection: 'row', backgroundColor: c.surface,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+      alignItems: 'center',
+    },
+    txLeft: { flex: 1 },
+    txMerchant: { fontSize: 15, fontWeight: '600', color: c.text, marginBottom: 4 },
+    txMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    badge: { backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+    badgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
+    txDate: { fontSize: 12, color: c.textSecondary },
+    txAmount: { fontSize: 15, fontWeight: '600', color: '#059669' },
+    empty: { alignItems: 'center', gap: 8, paddingTop: 24, paddingBottom: 24 },
+    emptyText: { fontSize: 16, fontWeight: '600', color: c.text },
+    emptySub: { fontSize: 14, color: c.textSecondary },
+    fab: {
+      position: 'absolute', bottom: 32, right: 24,
+      backgroundColor: '#059669', width: 56, height: 56,
+      borderRadius: 28, justifyContent: 'center', alignItems: 'center',
+      elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2, shadowRadius: 4,
+    },
+  });
+}

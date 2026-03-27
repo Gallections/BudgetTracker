@@ -4,6 +4,7 @@ const initialState = {
   baseCurrency: 'CAD',
   dbReady: false,
   refreshKey: 0,
+  theme: 'system' as const,
 };
 
 describe('appReducer — initial state', () => {
@@ -88,5 +89,23 @@ describe('appReducer — state immutability', () => {
     const frozen = Object.freeze({ ...initialState });
     expect(() => appReducer(frozen, { type: 'REFRESH' })).not.toThrow();
     expect(frozen.refreshKey).toBe(0);
+  });
+});
+
+describe('appReducer — SET_THEME', () => {
+  it('updates theme to dark', () => {
+    const next = appReducer(initialState, { type: 'SET_THEME', theme: 'dark' });
+    expect(next.theme).toBe('dark');
+  });
+
+  it('updates theme to light', () => {
+    const next = appReducer(initialState, { type: 'SET_THEME', theme: 'light' });
+    expect(next.theme).toBe('light');
+  });
+
+  it('does not mutate other fields', () => {
+    const next = appReducer(initialState, { type: 'SET_THEME', theme: 'dark' });
+    expect(next.baseCurrency).toBe(initialState.baseCurrency);
+    expect(next.refreshKey).toBe(initialState.refreshKey);
   });
 });

@@ -176,3 +176,79 @@ describe('parseExpense — return shape', () => {
     expect(result).toHaveProperty('notes');
   });
 });
+
+// ─── Custom categories ────────────────────────────────────────────────────────
+
+describe('parseExpense — custom categories', () => {
+  const customCats = [
+    { name: 'Entertainment', keywords: ['cineplex', 'amc', 'movie'] },
+    { name: 'Pets', keywords: ['vet', 'petco', 'dog food'] },
+  ];
+
+  it('matches a custom category keyword', () => {
+    expect(parseExpense('cineplex 15', customCats).category).toBe('Entertainment');
+  });
+
+  it('matches a multi-word custom keyword', () => {
+    expect(parseExpense('dog food 25', customCats).category).toBe('Pets');
+  });
+
+  it('custom keyword takes precedence over built-in keyword for same word', () => {
+    // 'fitness' is a built-in Fitness keyword; override it with custom
+    const overrideCats = [{ name: 'MyFitness', keywords: ['fitness'] }];
+    expect(parseExpense('fitness 50', overrideCats).category).toBe('MyFitness');
+  });
+
+  it('falls back to built-in keyword when no custom keyword matches', () => {
+    expect(parseExpense('netflix 17.99', customCats).category).toBe('Subscriptions');
+  });
+
+  it('returns Uncategorized when neither custom nor built-in keywords match', () => {
+    expect(parseExpense('random thing 10', customCats).category).toBe('Uncategorized');
+  });
+
+  it('ignores empty keyword strings in custom categories', () => {
+    const catsWithEmpty = [{ name: 'Empty', keywords: ['', '  '] }];
+    expect(parseExpense('coffee 5', catsWithEmpty).category).toBe('Food & Drink');
+  });
+
+  it('works when customCategories is undefined (no change to behaviour)', () => {
+    expect(parseExpense('gym 50').category).toBe('Fitness');
+  });
+});
+
+// ─── Merchant overrides ───────────────────────────────────────────────────────
+
+describe('parseExpense — merchant overrides', () => {
+  const overrides: Record<string, string> = {
+    'starbucks': 'Entertainment',
+    'amazon': 'Shopping',
+  };
+
+  it('uses merchant override when merchant matches', () => {
+    expect(parseExpense('starbucks 6', [], overrides).category).toBe('Entertainment');
+  });
+
+  it('override takes precedence over built-in keyword match', () => {
+    // 'starbucks' is built-in Food & Drink; override wins
+    expect(parseExpense('starbucks 6', [], overrides).category).toBe('Entertainment');
+  });
+
+  it('override takes precedence over custom category keywords', () => {
+    const customCats = [{ name: 'MyCat', keywords: ['starbucks'] }];
+    expect(parseExpense('starbucks 6', customCats, overrides).category).toBe('Entertainment');
+  });
+
+  it('falls back to keyword matching when merchant has no override', () => {
+    expect(parseExpense('netflix 15', [], overrides).category).toBe('Subscriptions');
+  });
+
+  it('does not apply override when merchant is empty', () => {
+    const overridesWithEmpty: Record<string, string> = { '': 'ShouldNotMatch' };
+    expect(parseExpense('paid 20 dollars', [], overridesWithEmpty).category).toBe('Uncategorized');
+  });
+
+  it('works when merchantOverrides is undefined', () => {
+    expect(parseExpense('gym 50', [], undefined).category).toBe('Fitness');
+  });
+});

@@ -1,11 +1,11 @@
-import { Category, KEYWORD_CATEGORY_MAP } from '../constants/categories';
+import { KEYWORD_CATEGORY_MAP } from '../constants/categories';
 import { DEFAULT_CURRENCY } from '../constants/currencies';
 
 export interface ParsedExpense {
   amount: number | null;
   currency: string;
   merchant: string;
-  category: Category;
+  category: string;
   notes: string | null;
 }
 
@@ -26,12 +26,11 @@ const FILLER_WORDS = new Set([
   'around', 'in', 'to', 'from', 'and', 'with', 'got',
 ]);
 
-// Sort keyword map keys longest-first so multi-word phrases match before single words
-const SORTED_KEYWORDS = Object.keys(KEYWORD_CATEGORY_MAP).sort(
-  (a, b) => b.length - a.length
-);
-
-export function parseExpense(transcript: string): ParsedExpense {
+export function parseExpense(
+  transcript: string,
+  customCategories?: { name: string; keywords: string[] }[],
+  merchantOverrides?: Record<string, string>
+): ParsedExpense {
   if (!transcript.trim()) {
     return { amount: null, currency: DEFAULT_CURRENCY, merchant: '', category: 'Uncategorized', notes: null };
   }
@@ -52,16 +51,7 @@ export function parseExpense(transcript: string): ParsedExpense {
     }
   }
 
-  // 3. Detect category — check multi-word phrases first
-  let category: Category = 'Uncategorized';
-  for (const keyword of SORTED_KEYWORDS) {
-    if (lower.includes(keyword)) {
-      category = KEYWORD_CATEGORY_MAP[keyword];
-      break;
-    }
-  }
-
-  // 4. Extract merchant — words that are not filler, currency, or numeric
+  // 3. Extract merchant — words that are not filler, currency, or numeric
   const merchantWords = words.filter(word => {
     if (FILLER_WORDS.has(word)) return false;
     if (CURRENCY_WORD_MAP[word]) return false;
@@ -72,6 +62,39 @@ export function parseExpense(transcript: string): ParsedExpense {
   const merchant = merchantWords
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+
+  // 4. Check merchant override first (highest precedence)
+  if (merchantOverrides && merchant) {
+    const override = merchantOverrides[merchant.toLowerCase()];
+    if (override) {
+      return { amount, currency, merchant, category: override, notes: null };
+    }
+  }
+
+  // 5. Build combined keyword map: custom category keywords first (higher precedence), then built-ins
+  const combinedMap: Record<string, string> = {};
+  for (const [kw, cat] of Object.entries(KEYWORD_CATEGORY_MAP)) {
+    combinedMap[kw] = cat;
+  }
+  if (customCategories) {
+    for (const cc of customCategories) {
+      for (const kw of cc.keywords) {
+        if (kw.trim()) combinedMap[kw.toLowerCase().trim()] = cc.name;
+      }
+    }
+  }
+
+  // Sort longest-first so multi-word phrases match before single words
+  const sortedKeywords = Object.keys(combinedMap).sort((a, b) => b.length - a.length);
+
+  // 6. Detect category from keywords
+  let category = 'Uncategorized';
+  for (const keyword of sortedKeywords) {
+    if (lower.includes(keyword)) {
+      category = combinedMap[keyword];
+      break;
+    }
+  }
 
   return { amount, currency, merchant, category, notes: null };
 }

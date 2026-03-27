@@ -16,10 +16,10 @@ export interface Transaction {
 }
 
 export async function insertTransaction(
-  tx: Omit<Transaction, 'id' | 'created_at' | 'deleted_at'>
+  tx: Omit<Transaction, 'id' | 'created_at' | 'deleted_at'> & { id?: string }
 ): Promise<Transaction> {
   const db = await getDatabase();
-  const id = Crypto.randomUUID();
+  const id = tx.id ?? Crypto.randomUUID();
   const created_at = new Date().toISOString();
   const type = tx.type ?? 'expense';
 

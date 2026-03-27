@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   SafeAreaView, ActivityIndicator, Alert, ScrollView, Dimensions,
@@ -13,6 +13,8 @@ import { Period } from '../../utils/dateRanges';
 import EditTransactionSheet from '../../components/EditTransactionSheet';
 import { getBudgets } from '../../db/userSettings';
 import { CATEGORIES, Category } from '../../constants/categories';
+import { Colors } from '../../constants/colors';
+import { useTheme } from '../../hooks/useTheme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -44,19 +46,10 @@ function toYMD(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
-const chartConfig = {
-  backgroundGradientFrom: '#ffffff',
-  backgroundGradientTo: '#ffffff',
-  color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-  strokeWidth: 2,
-  barPercentage: 0.6,
-  decimalPlaces: 0,
-  propsForLabels: { fontSize: 11 },
-};
-
 export default function DashboardScreen() {
   const { state, dispatch } = useApp();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState<Date>(new Date());
   const [customTo, setCustomTo] = useState<Date>(new Date());
@@ -86,13 +79,27 @@ export default function DashboardScreen() {
       return acc;
     }, {});
 
+  const chartConfig = useMemo(() => ({
+    backgroundGradientFrom: colors.surface,
+    backgroundGradientTo: colors.surface,
+    color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+    labelColor: (opacity = 1) => {
+      const rgb = colors === Colors.dark ? '156, 163, 175' : '107, 114, 128';
+      return `rgba(${rgb}, ${opacity})`;
+    },
+    strokeWidth: 2,
+    barPercentage: 0.6,
+    decimalPlaces: 0,
+    propsForLabels: { fontSize: 11 },
+  }), [colors]);
+
   const pieData = Object.entries(spendByCategory)
     .filter(([, v]) => v > 0)
     .map(([name, population]) => ({
       name: name.length > 12 ? name.slice(0, 12) + '…' : name,
       population: Math.round(population * 100) / 100,
       color: CATEGORY_COLORS[name] ?? '#9CA3AF',
-      legendFontColor: '#374151',
+      legendFontColor: colors.text,
       legendFontSize: 11,
     }));
 
@@ -308,7 +315,7 @@ export default function DashboardScreen() {
   );
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#2563EB" /></View>;
+    return <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
 
   return (
@@ -338,116 +345,118 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+function makeStyles(c: typeof Colors.light) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background },
 
-  // Net Worth
-  netWorthCard: {
-    backgroundColor: '#2563EB', margin: 16, borderRadius: 16,
-    padding: 20, alignItems: 'center',
-  },
-  netWorthLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
-  netWorthAmount: { color: 'white', fontSize: 36, fontWeight: '700', marginBottom: 12 },
-  netWorthRow: { flexDirection: 'row', gap: 24 },
-  netWorthSub: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  netWorthSubText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
+    // Net Worth
+    netWorthCard: {
+      backgroundColor: c.primary, margin: 16, borderRadius: 16,
+      padding: 20, alignItems: 'center',
+    },
+    netWorthLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
+    netWorthAmount: { color: 'white', fontSize: 36, fontWeight: '700', marginBottom: 12 },
+    netWorthRow: { flexDirection: 'row', gap: 24 },
+    netWorthSub: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    netWorthSubText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
 
-  // Period selector
-  periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
-  periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  periodChip: {
-    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'white',
-  },
-  periodChipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
-  periodChipText: { fontSize: 14, color: '#374151' },
-  periodChipTextActive: { color: 'white', fontWeight: '600' },
+    // Period selector
+    periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
+    periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+    periodChip: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: c.surface,
+    },
+    periodChipActive: { backgroundColor: c.primary, borderColor: c.primary },
+    periodChipText: { fontSize: 14, color: c.text },
+    periodChipTextActive: { color: 'white', fontWeight: '600' },
 
-  // Custom date range
-  customRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 12, marginHorizontal: 16, marginBottom: 8,
-  },
-  dateBtn: {
-    flex: 1, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB',
-    borderRadius: 10, padding: 10, alignItems: 'center',
-  },
-  dateBtnLabel: { fontSize: 11, color: '#6B7280', marginBottom: 2 },
-  dateBtnValue: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  dateSep: { fontSize: 16, color: '#9CA3AF' },
+    // Custom date range
+    customRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 12, marginHorizontal: 16, marginBottom: 8,
+    },
+    dateBtn: {
+      flex: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+      borderRadius: 10, padding: 10, alignItems: 'center',
+    },
+    dateBtnLabel: { fontSize: 11, color: c.textSecondary, marginBottom: 2 },
+    dateBtnValue: { fontSize: 14, fontWeight: '600', color: c.text },
+    dateSep: { fontSize: 16, color: c.textSecondary },
 
-  // Summary row
-  summaryRow: {
-    flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12,
-  },
-  summaryCard: {
-    flex: 1, borderRadius: 12, padding: 14, borderWidth: 1, backgroundColor: 'white',
-  },
-  summaryCardIncome: { borderColor: '#D1FAE5' },
-  summaryCardExpense: { borderColor: '#FEE2E2' },
-  summaryLabel: { fontSize: 13, color: '#6B7280', fontWeight: '500', marginBottom: 4 },
-  summaryAmount: { fontSize: 18, fontWeight: '700' },
-  summaryAmountIncome: { color: '#059669' },
-  summaryAmountExpense: { color: '#EF4444' },
+    // Summary row
+    summaryRow: {
+      flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12,
+    },
+    summaryCard: {
+      flex: 1, borderRadius: 12, padding: 14, borderWidth: 1, backgroundColor: c.surface,
+    },
+    summaryCardIncome: { borderColor: '#D1FAE5' },
+    summaryCardExpense: { borderColor: '#FEE2E2' },
+    summaryLabel: { fontSize: 13, color: c.textSecondary, fontWeight: '500', marginBottom: 4 },
+    summaryAmount: { fontSize: 18, fontWeight: '700' },
+    summaryAmountIncome: { color: '#059669' },
+    summaryAmountExpense: { color: '#EF4444' },
 
-  // Charts
-  chartCard: {
-    backgroundColor: 'white', marginHorizontal: 16, marginBottom: 12,
-    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E5E7EB',
-  },
-  chartTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 12 },
-  chartEmpty: { paddingVertical: 24, alignItems: 'center' },
-  chartEmptyText: { fontSize: 14, color: '#9CA3AF' },
+    // Charts
+    chartCard: {
+      backgroundColor: c.surface, marginHorizontal: 16, marginBottom: 12,
+      borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border,
+    },
+    chartTitle: { fontSize: 15, fontWeight: '700', color: c.text, marginBottom: 12 },
+    chartEmpty: { paddingVertical: 24, alignItems: 'center' },
+    chartEmptyText: { fontSize: 14, color: c.textSecondary },
 
-  // Budget gauges
-  gaugeRow: { marginBottom: 12 },
-  gaugeLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  gaugeLabel: { fontSize: 13, fontWeight: '500', color: '#374151' },
-  gaugeAmount: { fontSize: 12, color: '#6B7280' },
-  gaugeAmountOver: { color: '#EF4444', fontWeight: '600' },
-  gaugeTrack: {
-    height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden',
-  },
-  gaugeFill: {
-    height: 8, backgroundColor: '#2563EB', borderRadius: 4,
-  },
-  gaugeFillOver: { backgroundColor: '#EF4444' },
+    // Budget gauges
+    gaugeRow: { marginBottom: 12 },
+    gaugeLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+    gaugeLabel: { fontSize: 13, fontWeight: '500', color: c.text },
+    gaugeAmount: { fontSize: 12, color: c.textSecondary },
+    gaugeAmountOver: { color: '#EF4444', fontWeight: '600' },
+    gaugeTrack: {
+      height: 8, backgroundColor: c.border, borderRadius: 4, overflow: 'hidden',
+    },
+    gaugeFill: {
+      height: 8, backgroundColor: c.primary, borderRadius: 4,
+    },
+    gaugeFillOver: { backgroundColor: '#EF4444' },
 
-  // Section header
-  sectionHeader: {
-    fontSize: 17, fontWeight: '700', color: '#111827',
-    marginHorizontal: 16, marginBottom: 8, marginTop: 4,
-  },
+    // Section header
+    sectionHeader: {
+      fontSize: 17, fontWeight: '700', color: c.text,
+      marginHorizontal: 16, marginBottom: 8, marginTop: 4,
+    },
 
-  // Transaction rows
-  txRow: {
-    flexDirection: 'row', backgroundColor: 'white',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  txLeft: { flex: 1 },
-  txMerchant: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  txMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  badge: {
-    backgroundColor: '#EFF6FF', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
-  badgeIncome: { backgroundColor: '#ECFDF5' },
-  badgeText: { fontSize: 11, color: '#2563EB', fontWeight: '500' },
-  badgeTextIncome: { color: '#059669' },
-  typePill: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  typePillIncome: { backgroundColor: '#ECFDF5' },
-  typePillExpense: { backgroundColor: '#FEF2F2' },
-  typePillText: { fontSize: 10, fontWeight: '600', color: '#6B7280' },
-  txDate: { fontSize: 12, color: '#9CA3AF' },
-  txRight: { alignItems: 'flex-end', gap: 6 },
-  txAmount: { fontSize: 15, fontWeight: '600', color: '#EF4444' },
-  txAmountIncome: { color: '#059669' },
+    // Transaction rows
+    txRow: {
+      flexDirection: 'row', backgroundColor: c.surface,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+      alignItems: 'center',
+    },
+    txLeft: { flex: 1 },
+    txMerchant: { fontSize: 15, fontWeight: '600', color: c.text, marginBottom: 4 },
+    txMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    badge: {
+      backgroundColor: c.primaryLight, borderRadius: 8,
+      paddingHorizontal: 8, paddingVertical: 2,
+    },
+    badgeIncome: { backgroundColor: '#ECFDF5' },
+    badgeText: { fontSize: 11, color: c.primary, fontWeight: '500' },
+    badgeTextIncome: { color: '#059669' },
+    typePill: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+    typePillIncome: { backgroundColor: '#ECFDF5' },
+    typePillExpense: { backgroundColor: '#FEF2F2' },
+    typePillText: { fontSize: 10, fontWeight: '600', color: c.textSecondary },
+    txDate: { fontSize: 12, color: c.textSecondary },
+    txRight: { alignItems: 'flex-end', gap: 6 },
+    txAmount: { fontSize: 15, fontWeight: '600', color: '#EF4444' },
+    txAmountIncome: { color: '#059669' },
 
-  // Empty state
-  empty: { alignItems: 'center', gap: 8, paddingTop: 48 },
-  emptyText: { fontSize: 18, fontWeight: '600', color: '#374151' },
-  emptySub: { fontSize: 14, color: '#9CA3AF' },
-});
+    // Empty state
+    empty: { alignItems: 'center', gap: 8, paddingTop: 48 },
+    emptyText: { fontSize: 18, fontWeight: '600', color: c.text },
+    emptySub: { fontSize: 14, color: c.textSecondary },
+  });
+}

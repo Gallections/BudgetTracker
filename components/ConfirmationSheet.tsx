@@ -7,9 +7,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { insertTransaction } from '../db/transactions';
 import { ParsedExpense } from '../utils/nlpParser';
-import { CATEGORIES, Category } from '../constants/categories';
+import { CATEGORIES } from '../constants/categories';
 import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import { useApp } from '../context/AppContext';
+import { setMerchantOverride } from '../db/userSettings';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -18,14 +19,15 @@ interface Props {
   parsed: ParsedExpense;
   onClose: () => void;
   type?: 'income' | 'expense';
+  customCategories?: { name: string }[];
 }
 
-export default function ConfirmationSheet({ transcript, parsed, onClose, type = 'expense' }: Props) {
+export default function ConfirmationSheet({ transcript, parsed, onClose, type = 'expense', customCategories = [] }: Props) {
   const { dispatch } = useApp();
 
   const [amount, setAmount] = useState(parsed.amount?.toString() ?? '');
   const [currency, setCurrency] = useState(parsed.currency);
-  const [category, setCategory] = useState<Category>(parsed.category);
+  const [category, setCategory] = useState<string>(parsed.category);
   const [merchant, setMerchant] = useState(parsed.merchant);
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -41,12 +43,18 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
 
     setSaving(true);
     try {
+      // Save merchant override if user manually changed the category
+      const trimmedMerchant = merchant.trim();
+      if (trimmedMerchant && category !== parsed.category) {
+        await setMerchantOverride(trimmedMerchant, category);
+      }
+
       await insertTransaction({
         amount: amountNum,
         currency,
         amount_in_base_currency: amountNum, // placeholder — Phase 5 adds real conversion
         category,
-        merchant: merchant.trim(),
+        merchant: trimmedMerchant,
         notes: notes.trim() || null,
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type,
@@ -113,7 +121,7 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
           <Field label="Category">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.chipRow}>
-                {CATEGORIES.map(cat => (
+                {[...CATEGORIES, ...customCategories.map(c => c.name)].map(cat => (
                   <TouchableOpacity
                     key={cat}
                     style={[styles.chip, category === cat && styles.chipActive]}

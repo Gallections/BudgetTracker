@@ -1,9 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   SafeAreaView, ActivityIndicator, FlatList, ScrollView,
 } from 'react-native';
+import { Colors } from '../../constants/colors';
+import { useTheme } from '../../hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import {
   RegularExpense, getRegularExpenses, softDeleteRegularExpense,
@@ -35,6 +37,8 @@ const EXPENSE_PERIODS: { key: Period; label: string }[] = [
 
 export default function ExpensesScreen() {
   const { state, dispatch } = useApp();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [subTab, setSubTab] = useState<SubTab>('one_time');
 
   // One-time expenses state
@@ -227,7 +231,7 @@ export default function ExpensesScreen() {
   );
 
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#EF4444" /></View>;
+    return <View style={styles.centered}><ActivityIndicator size="large" color={colors.danger} /></View>;
   }
 
   return (
@@ -307,94 +311,83 @@ export default function ExpensesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  // Sub-tab bar
-  subTabBar: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
-  },
-  subTab: {
-    flex: 1, paddingVertical: 14, alignItems: 'center',
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
-  },
-  subTabActive: { borderBottomColor: '#EF4444' },
-  subTabText: { fontSize: 15, fontWeight: '600', color: '#9CA3AF' },
-  subTabTextActive: { color: '#EF4444' },
-
-  // Period selector
-  periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
-  periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  periodChip: {
-    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'white',
-  },
-  periodChipActive: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
-  periodChipText: { fontSize: 14, color: '#374151' },
-  periodChipTextActive: { color: 'white', fontWeight: '600' },
-
-  // Spend card
-  spendCard: {
-    backgroundColor: 'white', margin: 16,
-    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E5E7EB',
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  spendLabel: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
-  spendAmount: { fontSize: 20, fontWeight: '700', color: '#EF4444' },
-
-  // One-time transaction rows
-  txRow: {
-    flexDirection: 'row', backgroundColor: 'white',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  txLeft: { flex: 1 },
-  txMerchant: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  txMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  txDate: { fontSize: 12, color: '#9CA3AF' },
-  txAmount: { fontSize: 15, fontWeight: '600', color: '#111827' },
-
-  // Recurring expense rows
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'white', paddingRight: 8, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-  },
-  rowOverdue: { backgroundColor: '#FFFBEB' },
-  overdueBar: { width: 4, alignSelf: 'stretch', backgroundColor: '#F59E0B', borderRadius: 2, marginLeft: 4 },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginLeft: 12, marginRight: 8 },
-  rowLeft: { flex: 1 },
-  expenseName: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  badgeRow: { flexDirection: 'row', marginTop: 4, gap: 6 },
-  badge: {
-    alignSelf: 'flex-start', backgroundColor: '#FEF2F2',
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
-  },
-  badgeText: { fontSize: 11, color: '#EF4444', fontWeight: '500' },
-  freqBadge: { backgroundColor: '#F3F4F6' },
-  freqBadgeText: { color: '#6B7280' },
-  amountCol: { alignItems: 'flex-end' },
-  amount: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  overdueLabel: { fontSize: 11, color: '#F59E0B', fontWeight: '600', marginTop: 2 },
-  rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
-  orderBtn: { padding: 4 },
-  orderBtnDisabled: { opacity: 0.3 },
-  deleteBtn: { padding: 4, marginTop: 4 },
-
-  // Empty states
-  empty: { alignItems: 'center', gap: 8, paddingTop: 48 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  emptySub: { fontSize: 14, color: '#9CA3AF' },
-
-  fab: {
-    position: 'absolute', bottom: 32, right: 24,
-    backgroundColor: '#EF4444', width: 56, height: 56,
-    borderRadius: 28, justifyContent: 'center', alignItems: 'center',
-    elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2, shadowRadius: 4,
-  },
-});
+function makeStyles(c: typeof Colors.light) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background },
+    subTabBar: {
+      flexDirection: 'row',
+      backgroundColor: c.surface,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    subTab: {
+      flex: 1, paddingVertical: 14, alignItems: 'center',
+      borderBottomWidth: 2, borderBottomColor: 'transparent',
+    },
+    subTabActive: { borderBottomColor: '#EF4444' },
+    subTabText: { fontSize: 15, fontWeight: '600', color: c.textSecondary },
+    subTabTextActive: { color: '#EF4444' },
+    periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
+    periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+    periodChip: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: c.surface,
+    },
+    periodChipActive: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
+    periodChipText: { fontSize: 14, color: c.text },
+    periodChipTextActive: { color: 'white', fontWeight: '600' },
+    spendCard: {
+      backgroundColor: c.surface, margin: 16,
+      borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    spendLabel: { fontSize: 15, color: c.textSecondary, fontWeight: '500' },
+    spendAmount: { fontSize: 20, fontWeight: '700', color: '#EF4444' },
+    txRow: {
+      flexDirection: 'row', backgroundColor: c.surface,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+      alignItems: 'center',
+    },
+    txLeft: { flex: 1 },
+    txMerchant: { fontSize: 15, fontWeight: '600', color: c.text, marginBottom: 4 },
+    txMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    txDate: { fontSize: 12, color: c.textSecondary },
+    txAmount: { fontSize: 15, fontWeight: '600', color: c.text },
+    row: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: c.surface, paddingRight: 8, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    rowOverdue: { backgroundColor: '#FFFBEB' },
+    overdueBar: { width: 4, alignSelf: 'stretch', backgroundColor: '#F59E0B', borderRadius: 2, marginLeft: 4 },
+    rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginLeft: 12, marginRight: 8 },
+    rowLeft: { flex: 1 },
+    expenseName: { fontSize: 16, fontWeight: '600', color: c.text },
+    badgeRow: { flexDirection: 'row', marginTop: 4, gap: 6 },
+    badge: {
+      alignSelf: 'flex-start', backgroundColor: '#FEF2F2',
+      borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
+    },
+    badgeText: { fontSize: 11, color: '#EF4444', fontWeight: '500' },
+    freqBadge: { backgroundColor: c.border },
+    freqBadgeText: { color: c.textSecondary },
+    amountCol: { alignItems: 'flex-end' },
+    amount: { fontSize: 16, fontWeight: '600', color: c.text },
+    overdueLabel: { fontSize: 11, color: '#F59E0B', fontWeight: '600', marginTop: 2 },
+    rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
+    orderBtn: { padding: 4 },
+    orderBtnDisabled: { opacity: 0.3 },
+    deleteBtn: { padding: 4, marginTop: 4 },
+    empty: { alignItems: 'center', gap: 8, paddingTop: 48 },
+    emptyText: { fontSize: 16, fontWeight: '600', color: c.text },
+    emptySub: { fontSize: 14, color: c.textSecondary },
+    fab: {
+      position: 'absolute', bottom: 32, right: 24,
+      backgroundColor: '#EF4444', width: 56, height: 56,
+      borderRadius: 28, justifyContent: 'center', alignItems: 'center',
+      elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2, shadowRadius: 4,
+    },
+  });
+}

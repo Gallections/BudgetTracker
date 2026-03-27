@@ -20,7 +20,8 @@
       "Bash(node_modules/.bin/tsc --noEmit --strict 2>&1)",
       "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck false)",
       "Bash(node_modules/.bin/tsc --noEmit 2>&1)",
-      "Bash(ls -la /c/coding/Apps/BudgetTracker/app/\\\\\\(tabs\\\\\\)/)"
+      "Bash(ls -la /c/coding/Apps/BudgetTracker/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(grep -r categories C:codingAppsBudgetTracker/db --include=*.ts)"
     ]
   }
 }

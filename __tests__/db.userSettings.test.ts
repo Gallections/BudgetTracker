@@ -26,6 +26,9 @@ import {
   getBudgets,
   setBudget,
   clearBudget,
+  getMerchantOverrides,
+  setMerchantOverride,
+  clearMerchantOverride,
 } from '../db/userSettings';
 
 // ─── getUserSetting ───────────────────────────────────────────────────────────
@@ -180,5 +183,89 @@ describe('clearBudget', () => {
     await clearBudget('Housing');
     const params: unknown[] = mockDb.runAsync.mock.calls[0][1];
     expect(params).toContain('budget_Housing');
+  });
+});
+
+// ─── getMerchantOverrides ─────────────────────────────────────────────────────
+
+describe('getMerchantOverrides', () => {
+  it('queries with merchant_override_ prefix filter', async () => {
+    await getMerchantOverrides();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain("LIKE 'merchant_override_%'");
+  });
+
+  it('returns empty object when no overrides', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([]);
+    const result = await getMerchantOverrides();
+    expect(result).toEqual({});
+  });
+
+  it('strips prefix and maps merchant → category correctly', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { key: 'merchant_override_starbucks', value: 'Food & Drink' },
+      { key: 'merchant_override_planet fitness', value: 'Fitness' },
+    ]);
+    const result = await getMerchantOverrides();
+    expect(result['starbucks']).toBe('Food & Drink');
+    expect(result['planet fitness']).toBe('Fitness');
+  });
+
+  it('handles multiple overrides', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { key: 'merchant_override_a', value: 'Cat A' },
+      { key: 'merchant_override_b', value: 'Cat B' },
+      { key: 'merchant_override_c', value: 'Cat C' },
+    ]);
+    const result = await getMerchantOverrides();
+    expect(Object.keys(result)).toHaveLength(3);
+  });
+});
+
+// ─── setMerchantOverride ──────────────────────────────────────────────────────
+
+describe('setMerchantOverride', () => {
+  it('calls runAsync once', async () => {
+    await setMerchantOverride('Tim Hortons', 'Food & Drink');
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('lowercases and trims the merchant in the key', async () => {
+    await setMerchantOverride('  Tim Hortons  ', 'Food & Drink');
+    const params: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(params).toContain('merchant_override_tim hortons');
+  });
+
+  it('stores the category as the value', async () => {
+    await setMerchantOverride('Starbucks', 'Entertainment');
+    const params: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(params).toContain('Entertainment');
+  });
+
+  it('uses INSERT OR REPLACE', async () => {
+    await setMerchantOverride('Netflix', 'Subscriptions');
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql.toUpperCase()).toContain('INSERT OR REPLACE');
+  });
+});
+
+// ─── clearMerchantOverride ────────────────────────────────────────────────────
+
+describe('clearMerchantOverride', () => {
+  it('calls runAsync once', async () => {
+    await clearMerchantOverride('Starbucks');
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses DELETE statement', async () => {
+    await clearMerchantOverride('Starbucks');
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql.toUpperCase()).toContain('DELETE');
+  });
+
+  it('targets the correct merchant key (lowercased)', async () => {
+    await clearMerchantOverride('Tim Hortons');
+    const params: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(params).toContain('merchant_override_tim hortons');
   });
 });

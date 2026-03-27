@@ -48,3 +48,42 @@ export async function clearBudget(category: Category): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM user_settings WHERE key = ?', [`budget_${category}`]);
 }
+
+// ─── Theme preference ─────────────────────────────────────────────────────────
+
+export async function getThemePreference(): Promise<'system' | 'light' | 'dark'> {
+  const val = await getUserSetting('theme_preference');
+  if (val === 'light' || val === 'dark' || val === 'system') return val;
+  return 'system';
+}
+
+export async function setThemePreference(theme: 'system' | 'light' | 'dark'): Promise<void> {
+  return setUserSetting('theme_preference', theme);
+}
+
+// ─── Merchant overrides ────────────────────────────────────────────────────────
+// key pattern: merchant_override_{lowercased merchant} → category name
+
+export async function getMerchantOverrides(): Promise<Record<string, string>> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    "SELECT key, value FROM user_settings WHERE key LIKE 'merchant_override_%'"
+  );
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    const merchant = row.key.replace('merchant_override_', '');
+    result[merchant] = row.value;
+  }
+  return result;
+}
+
+export async function setMerchantOverride(merchant: string, category: string): Promise<void> {
+  return setUserSetting(`merchant_override_${merchant.toLowerCase().trim()}`, category);
+}
+
+export async function clearMerchantOverride(merchant: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM user_settings WHERE key = ?', [
+    `merchant_override_${merchant.toLowerCase().trim()}`,
+  ]);
+}

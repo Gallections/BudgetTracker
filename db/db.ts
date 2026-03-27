@@ -100,6 +100,14 @@ export async function initDatabase(): Promise<void> {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS custom_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      keywords TEXT NOT NULL DEFAULT '[]',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT
+    );
+
     INSERT OR IGNORE INTO user_settings (key, value) VALUES ('base_currency', 'CAD');
     INSERT OR IGNORE INTO user_settings (key, value) VALUES ('monthly_budget', '2000');
   `);
