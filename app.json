@@ -30,7 +30,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow PocketLedger to use the microphone for voice expense entry.",
+          "speechRecognitionPermission": "Allow PocketLedger to transcribe your voice for expense logging."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

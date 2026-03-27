@@ -19,7 +19,8 @@
       "Bash(node_modules/.bin/jest --no-coverage)",
       "Bash(node_modules/.bin/tsc --noEmit --strict 2>&1)",
       "Bash(node_modules/.bin/tsc --noEmit --skipLibCheck false)",
-      "Bash(node_modules/.bin/tsc --noEmit 2>&1)"
+      "Bash(node_modules/.bin/tsc --noEmit 2>&1)",
+      "Bash(ls -la /c/coding/Apps/BudgetTracker/app/\\\\\\(tabs\\\\\\)/)"
     ]
   }
 }
