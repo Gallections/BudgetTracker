@@ -43,9 +43,10 @@ export async function getTransactions(options?: {
   const conditions: string[] = ['deleted_at IS NULL'];
   const params: (string | number)[] = [];
 
-  if (options?.type) {
-    conditions.push('type = ?');
-    params.push(options.type);
+  if (options?.type === 'expense') {
+    conditions.push("(type = 'expense' OR type IS NULL)");
+  } else if (options?.type === 'income') {
+    conditions.push("type = 'income'");
   }
   if (options?.category) {
     conditions.push('category = ?');

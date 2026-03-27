@@ -165,22 +165,23 @@ describe('getTransactions', () => {
     expect(sql).not.toContain('LIMIT');
   });
 
-  it('applies type filter when provided', async () => {
+  it('applies income type filter when provided', async () => {
     await getTransactions({ type: 'income' });
     const sql: string = mockDb.getAllAsync.mock.calls[0][0];
-    expect(sql).toContain('type = ?');
+    expect(sql).toContain("type = 'income'");
   });
 
-  it('passes type value as bind parameter', async () => {
+  it('applies expense type filter including NULL rows', async () => {
     await getTransactions({ type: 'expense' });
-    const params: unknown[] = mockDb.getAllAsync.mock.calls[0][1];
-    expect(params).toContain('expense');
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain("type = 'expense' OR type IS NULL");
   });
 
   it('does not add type filter when not provided', async () => {
     await getTransactions();
     const sql: string = mockDb.getAllAsync.mock.calls[0][0];
-    expect(sql).not.toContain('type = ?');
+    expect(sql).not.toContain("type = 'income'");
+    expect(sql).not.toContain("type = 'expense'");
   });
 });
 

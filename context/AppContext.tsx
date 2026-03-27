@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { initDatabase } from '../db/db';
+import { getBaseCurrency } from '../db/userSettings';
 
 interface AppState {
   baseCurrency: string;
@@ -41,7 +42,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     initDatabase()
-      .then(() => dispatch({ type: 'DB_READY' }))
+      .then(async () => {
+        const savedCurrency = await getBaseCurrency();
+        dispatch({ type: 'SET_BASE_CURRENCY', currency: savedCurrency });
+        dispatch({ type: 'DB_READY' });
+      })
       .catch(console.error);
   }, []);
 

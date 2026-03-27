@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   SafeAreaView, ActivityIndicator, FlatList, ScrollView,
@@ -65,6 +66,10 @@ export default function ExpensesScreen() {
   useEffect(() => {
     if (state.dbReady) loadData();
   }, [state.dbReady, state.refreshKey, loadData]);
+
+  useFocusEffect(useCallback(() => {
+    if (state.dbReady) loadData();
+  }, [state.dbReady, loadData]));
 
   const oneTimeTotal = oneTimeTxns.reduce((sum, t) => sum + t.amount, 0);
   const monthlyTotal = expenses.reduce((sum, e) => {

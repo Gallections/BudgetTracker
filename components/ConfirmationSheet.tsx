@@ -48,7 +48,7 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
         category,
         merchant: merchant.trim(),
         notes: notes.trim() || null,
-        date: date.toISOString().split('T')[0],
+        date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type,
       });
       dispatch({ type: 'REFRESH' });

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   SafeAreaView, ActivityIndicator, FlatList, ScrollView,
@@ -50,6 +51,10 @@ export default function SavingsScreen() {
   useEffect(() => {
     if (state.dbReady) loadData();
   }, [state.dbReady, state.refreshKey, loadData]);
+
+  useFocusEffect(useCallback(() => {
+    if (state.dbReady) loadData();
+  }, [state.dbReady, loadData]));
 
   const totalBalanceCAD = accounts.reduce((sum, a) => sum + a.balance, 0);
   const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);

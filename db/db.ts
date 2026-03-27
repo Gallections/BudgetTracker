@@ -12,13 +12,21 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 }
 
 async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Migration v2: add type column to transactions
+  // Migration v2: add type column to transactions (nullable — NOT NULL DEFAULT fails on SQLite < 3.37.0)
   try {
     await database.execAsync(
-      `ALTER TABLE transactions ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'`
+      `ALTER TABLE transactions ADD COLUMN type TEXT DEFAULT 'expense'`
     );
   } catch {
     // Column already exists — idempotent
+  }
+  // Backfill any rows inserted before migration ran (NULL → 'expense')
+  try {
+    await database.execAsync(
+      `UPDATE transactions SET type = 'expense' WHERE type IS NULL`
+    );
+  } catch {
+    // Best-effort backfill
   }
 
   // Migration v3: add start_date column to regular_expenses
