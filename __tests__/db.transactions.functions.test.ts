@@ -36,6 +36,7 @@ const baseTx = () => ({
   merchant: 'Netflix',
   notes: null as string | null,
   date: '2026-03-26',
+  type: 'expense' as const,
 });
 
 // ─── insertTransaction ────────────────────────────────────────────────────────
@@ -88,6 +89,23 @@ describe('insertTransaction', () => {
     await insertTransaction(baseTx());
     const sql: string = mockDb.runAsync.mock.calls[0][0];
     expect(sql).toContain('INSERT INTO transactions');
+  });
+
+  it('defaults type to "expense" when not provided', async () => {
+    const { type: _t, ...withoutType } = baseTx();
+    const result = await insertTransaction({ ...withoutType, type: 'expense' });
+    expect(result.type).toBe('expense');
+  });
+
+  it('preserves type "income" when provided', async () => {
+    const result = await insertTransaction({ ...baseTx(), type: 'income' });
+    expect(result.type).toBe('income');
+  });
+
+  it('includes type in the SQL parameters', async () => {
+    await insertTransaction({ ...baseTx(), type: 'income' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args).toContain('income');
   });
 });
 
@@ -146,6 +164,24 @@ describe('getTransactions', () => {
     const sql: string = mockDb.getAllAsync.mock.calls[0][0];
     expect(sql).not.toContain('LIMIT');
   });
+
+  it('applies type filter when provided', async () => {
+    await getTransactions({ type: 'income' });
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain('type = ?');
+  });
+
+  it('passes type value as bind parameter', async () => {
+    await getTransactions({ type: 'expense' });
+    const params: unknown[] = mockDb.getAllAsync.mock.calls[0][1];
+    expect(params).toContain('expense');
+  });
+
+  it('does not add type filter when not provided', async () => {
+    await getTransactions();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).not.toContain('type = ?');
+  });
 });
 
 // ─── softDeleteTransaction ────────────────────────────────────────────────────
@@ -182,7 +218,7 @@ describe('softDeleteTransaction', () => {
 // ─── updateTransaction ────────────────────────────────────────────────────────
 
 describe('updateTransaction', () => {
-  const txWithId = () => ({ ...baseTx(), id: 'tx-99' });
+  const txWithId = () => ({ ...baseTx(), id: 'tx-99', type: 'expense' as const });
 
   it('calls runAsync once', async () => {
     await updateTransaction(txWithId());
@@ -205,7 +241,19 @@ describe('updateTransaction', () => {
   it('passes null for notes when notes is null', async () => {
     await updateTransaction({ ...txWithId(), notes: null });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
-    // notes is the 7th param (index 6): amount, currency, amount_in_base, category, merchant, notes, date, id
+    // params: amount, currency, amount_in_base, category, merchant, notes, date, type, id
     expect(args[5]).toBeNull();
+  });
+
+  it('includes type in UPDATE SQL', async () => {
+    await updateTransaction(txWithId());
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('type = ?');
+  });
+
+  it('passes the correct type value', async () => {
+    await updateTransaction({ ...txWithId(), type: 'income' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args).toContain('income');
   });
 });

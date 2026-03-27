@@ -33,67 +33,76 @@ describe('getDatabase', () => {
 });
 
 describe('initDatabase — schema SQL', () => {
-  let capturedSql = '';
+  let capturedSqlCalls: string[] = [];
+  let schemaSql = '';
 
   beforeEach(async () => {
-    capturedSql = '';
+    capturedSqlCalls = [];
     mockDb.execAsync.mockImplementation(async (sql: string) => {
-      capturedSql = sql;
+      capturedSqlCalls.push(sql);
     });
     await jest.isolateModulesAsync(async () => {
       const { initDatabase } = require('../db/db');
       await initDatabase();
     });
+    // First call is always the main schema SQL
+    schemaSql = capturedSqlCalls[0] ?? '';
   });
 
-  it('calls execAsync once', () => {
-    expect(mockDb.execAsync).toHaveBeenCalledTimes(1);
+  it('calls execAsync at least once for the main schema', () => {
+    expect(mockDb.execAsync).toHaveBeenCalled();
   });
 
   it('enables WAL journal mode', () => {
-    expect(capturedSql).toContain('PRAGMA journal_mode = WAL');
+    expect(schemaSql).toContain('PRAGMA journal_mode = WAL');
   });
 
   it('creates transactions table', () => {
-    expect(capturedSql).toContain('CREATE TABLE IF NOT EXISTS transactions');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS transactions');
   });
 
   it('creates savings_accounts table', () => {
-    expect(capturedSql).toContain('CREATE TABLE IF NOT EXISTS savings_accounts');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS savings_accounts');
   });
 
   it('creates regular_expenses table', () => {
-    expect(capturedSql).toContain('CREATE TABLE IF NOT EXISTS regular_expenses');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS regular_expenses');
   });
 
   it('creates exchange_rate_cache table', () => {
-    expect(capturedSql).toContain('CREATE TABLE IF NOT EXISTS exchange_rate_cache');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS exchange_rate_cache');
   });
 
   it('creates user_settings table', () => {
-    expect(capturedSql).toContain('CREATE TABLE IF NOT EXISTS user_settings');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS user_settings');
   });
 
   it('seeds base_currency = CAD', () => {
-    expect(capturedSql).toContain("INSERT OR IGNORE INTO user_settings (key, value) VALUES ('base_currency', 'CAD')");
+    expect(schemaSql).toContain("INSERT OR IGNORE INTO user_settings (key, value) VALUES ('base_currency', 'CAD')");
   });
 
   it('seeds monthly_budget default', () => {
-    expect(capturedSql).toContain("INSERT OR IGNORE INTO user_settings (key, value) VALUES ('monthly_budget', '2000')");
+    expect(schemaSql).toContain("INSERT OR IGNORE INTO user_settings (key, value) VALUES ('monthly_budget', '2000')");
   });
 
   it('transactions table has deleted_at column', () => {
-    const block = capturedSql.slice(capturedSql.indexOf('CREATE TABLE IF NOT EXISTS transactions'));
+    const block = schemaSql.slice(schemaSql.indexOf('CREATE TABLE IF NOT EXISTS transactions'));
     expect(block).toContain('deleted_at');
   });
 
   it('savings_accounts table has deleted_at column', () => {
-    const block = capturedSql.slice(capturedSql.indexOf('CREATE TABLE IF NOT EXISTS savings_accounts'));
+    const block = schemaSql.slice(schemaSql.indexOf('CREATE TABLE IF NOT EXISTS savings_accounts'));
     expect(block).toContain('deleted_at');
   });
 
   it('regular_expenses table has deleted_at column', () => {
-    const block = capturedSql.slice(capturedSql.indexOf('CREATE TABLE IF NOT EXISTS regular_expenses'));
+    const block = schemaSql.slice(schemaSql.indexOf('CREATE TABLE IF NOT EXISTS regular_expenses'));
     expect(block).toContain('deleted_at');
+  });
+
+  it('runs migration ALTER statements for new columns', () => {
+    const allSql = capturedSqlCalls.join('\n');
+    expect(allSql).toContain('ALTER TABLE transactions ADD COLUMN type');
+    expect(allSql).toContain('ALTER TABLE regular_expenses ADD COLUMN start_date');
   });
 });

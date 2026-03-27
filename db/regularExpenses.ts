@@ -13,6 +13,7 @@ export interface RegularExpense {
   notes: string | null;
   sort_order: number;
   deleted_at: string | null;
+  start_date: string | null;
 }
 
 export type Frequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually';
@@ -35,14 +36,16 @@ export async function getRegularExpenses(): Promise<RegularExpense[]> {
 }
 
 export async function upsertRegularExpense(
-  expense: Omit<RegularExpense, 'id' | 'deleted_at'> & { id?: string }
+  expense: Omit<RegularExpense, 'id' | 'deleted_at' | 'start_date'> & { id?: string; start_date?: string | null }
 ): Promise<RegularExpense> {
   const db = await getDatabase();
+  const isNew = !expense.id;
   const id = expense.id ?? Crypto.randomUUID();
+  const start_date = expense.start_date ?? (isNew ? new Date().toISOString().split('T')[0] : null);
 
   await db.runAsync(
-    `INSERT INTO regular_expenses (id, name, category, amount, currency, frequency, due_day, outstanding_balance, notes, sort_order, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+    `INSERT INTO regular_expenses (id, name, category, amount, currency, frequency, due_day, outstanding_balance, notes, sort_order, deleted_at, start_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        category = excluded.category,
@@ -56,11 +59,11 @@ export async function upsertRegularExpense(
     [
       id, expense.name, expense.category, expense.amount, expense.currency,
       expense.frequency, expense.due_day ?? null, expense.outstanding_balance ?? null,
-      expense.notes ?? null, expense.sort_order,
+      expense.notes ?? null, expense.sort_order, start_date,
     ]
   );
 
-  return { ...expense, id, deleted_at: null };
+  return { ...expense, id, deleted_at: null, start_date: start_date ?? null };
 }
 
 export async function softDeleteRegularExpense(id: string): Promise<void> {

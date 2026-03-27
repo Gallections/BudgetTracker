@@ -11,6 +11,26 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   return db;
 }
 
+async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
+  // Migration v2: add type column to transactions
+  try {
+    await database.execAsync(
+      `ALTER TABLE transactions ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'`
+    );
+  } catch {
+    // Column already exists — idempotent
+  }
+
+  // Migration v3: add start_date column to regular_expenses
+  try {
+    await database.execAsync(
+      `ALTER TABLE regular_expenses ADD COLUMN start_date TEXT`
+    );
+  } catch {
+    // Column already exists — idempotent
+  }
+}
+
 export async function initDatabase(): Promise<void> {
   const database = await getDatabase();
 
@@ -27,7 +47,8 @@ export async function initDatabase(): Promise<void> {
       notes TEXT,
       date TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      deleted_at TEXT
+      deleted_at TEXT,
+      type TEXT NOT NULL DEFAULT 'expense'
     );
 
     CREATE TABLE IF NOT EXISTS savings_accounts (
@@ -54,7 +75,8 @@ export async function initDatabase(): Promise<void> {
       outstanding_balance REAL,
       notes TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
-      deleted_at TEXT
+      deleted_at TEXT,
+      start_date TEXT
     );
 
     CREATE TABLE IF NOT EXISTS exchange_rate_cache (
@@ -73,4 +95,6 @@ export async function initDatabase(): Promise<void> {
     INSERT OR IGNORE INTO user_settings (key, value) VALUES ('base_currency', 'CAD');
     INSERT OR IGNORE INTO user_settings (key, value) VALUES ('monthly_budget', '2000');
   `);
+
+  await runMigrations(database);
 }

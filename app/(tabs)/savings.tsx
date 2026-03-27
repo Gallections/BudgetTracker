@@ -1,36 +1,58 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  SafeAreaView, ActivityIndicator, FlatList,
+  SafeAreaView, ActivityIndicator, FlatList, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SavingsAccount, getSavingsAccounts, softDeleteSavingsAccount, updateSavingsOrder } from '../../db/savings';
+import { Transaction, getTransactions } from '../../db/transactions';
 import { useApp } from '../../context/AppContext';
 import AddEditAccountSheet from '../../components/AddEditAccountSheet';
+import EditTransactionSheet from '../../components/EditTransactionSheet';
+import { Period, getDateRange } from '../../utils/dateRanges';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function fmt(amount: number, currency = 'CAD') {
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(amount);
+}
+
+const INCOME_PERIODS: { key: Period; label: string }[] = [
+  { key: 'this_month', label: 'This Month' },
+  { key: 'last_month', label: 'Last Month' },
+  { key: 'last_3_months', label: '3 Months' },
+];
 
 export default function SavingsScreen() {
   const { state, dispatch } = useApp();
   const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
+  const [incomeTransactions, setIncomeTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SavingsAccount | null>(null);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [incomePeriod, setIncomePeriod] = useState<Period>('this_month');
 
-  const loadAccounts = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const data = await getSavingsAccounts();
-      setAccounts(data);
+      const { dateFrom, dateTo } = getDateRange(incomePeriod);
+      const [accts, txns] = await Promise.all([
+        getSavingsAccounts(),
+        getTransactions({ type: 'income', dateFrom, dateTo }),
+      ]);
+      setAccounts(accts);
+      setIncomeTransactions(txns);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [incomePeriod]);
 
   useEffect(() => {
-    if (state.dbReady) loadAccounts();
-  }, [state.dbReady, state.refreshKey, loadAccounts]);
+    if (state.dbReady) loadData();
+  }, [state.dbReady, state.refreshKey, loadData]);
 
   const totalBalanceCAD = accounts.reduce((sum, a) => sum + a.balance, 0);
+  const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
 
   const handleDelete = (account: SavingsAccount) => {
     Alert.alert(
@@ -74,7 +96,7 @@ export default function SavingsScreen() {
     dispatch({ type: 'REFRESH' });
   };
 
-  const renderItem = ({ item, index }: { item: SavingsAccount; index: number }) => (
+  const renderAccount = ({ item, index }: { item: SavingsAccount; index: number }) => (
     <View style={styles.row}>
       <TouchableOpacity style={styles.rowMain} onPress={() => openEdit(item)} activeOpacity={0.7}>
         <View style={styles.rowLeft}>
@@ -85,7 +107,7 @@ export default function SavingsScreen() {
           </View>
         </View>
         <Text style={styles.balance}>
-          {new Intl.NumberFormat('en-CA', { style: 'currency', currency: item.currency }).format(item.balance)}
+          {fmt(item.balance, item.currency)}
         </Text>
       </TouchableOpacity>
 
@@ -111,33 +133,90 @@ export default function SavingsScreen() {
     </View>
   );
 
+  const renderIncomeTx = ({ item }: { item: Transaction }) => (
+    <TouchableOpacity style={styles.txRow} onPress={() => setEditingTx(item)} activeOpacity={0.7}>
+      <View style={styles.txLeft}>
+        <Text style={styles.txMerchant}>{item.merchant || '—'}</Text>
+        <View style={styles.txMeta}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{item.category}</Text>
+          </View>
+          <Text style={styles.txDate}>{item.date}</Text>
+        </View>
+      </View>
+      <Text style={styles.txAmount}>{fmt(item.amount, item.currency)}</Text>
+    </TouchableOpacity>
+  );
+
+  const ListHeader = () => (
+    <>
+      {/* Accounts section */}
+      <View style={styles.totalCard}>
+        <Text style={styles.totalLabel}>Total Accounts</Text>
+        <Text style={styles.totalAmount}>{fmt(totalBalanceCAD)}</Text>
+      </View>
+      <Text style={styles.sectionHeader}>Accounts</Text>
+
+      {accounts.length === 0 && (
+        <View style={styles.inlineEmpty}>
+          <Text style={styles.inlineEmptyText}>No accounts yet — tap + to add one</Text>
+        </View>
+      )}
+
+      {accounts.map((item, index) => (
+        <React.Fragment key={item.id}>{renderAccount({ item, index })}</React.Fragment>
+      ))}
+
+      {/* Income History section */}
+      <Text style={[styles.sectionHeader, { marginTop: 16 }]}>Income History</Text>
+
+      {/* Period chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
+        <View style={styles.periodRow}>
+          {INCOME_PERIODS.map(p => (
+            <TouchableOpacity
+              key={p.key}
+              style={[styles.periodChip, incomePeriod === p.key && styles.periodChipActive]}
+              onPress={() => setIncomePeriod(p.key)}
+            >
+              <Text style={[styles.periodChipText, incomePeriod === p.key && styles.periodChipTextActive]}>
+                {p.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Income total card */}
+      <View style={styles.incomeCard}>
+        <Text style={styles.incomeLabel}>
+          {INCOME_PERIODS.find(p => p.key === incomePeriod)?.label} Income
+        </Text>
+        <Text style={styles.incomeAmount}>{fmt(totalIncome)}</Text>
+      </View>
+    </>
+  );
+
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color="#2563EB" /></View>;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>Total Savings</Text>
-        <Text style={styles.totalAmount}>
-          {new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(totalBalanceCAD)}
-        </Text>
-      </View>
-
-      {accounts.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name={'wallet-outline' as IoniconName} size={48} color="#D1D5DB" />
-          <Text style={styles.emptyText}>No accounts yet</Text>
-          <Text style={styles.emptySub}>Tap + to add your first account</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={accounts}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 100 }}
-        />
-      )}
+      <FlatList
+        data={incomeTransactions}
+        keyExtractor={item => item.id}
+        renderItem={renderIncomeTx}
+        ListHeaderComponent={<ListHeader />}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name={'cash-outline' as IoniconName} size={40} color="#D1D5DB" />
+            <Text style={styles.emptyText}>No income recorded</Text>
+            <Text style={styles.emptySub}>Log income from the Home tab</Text>
+          </View>
+        }
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
 
       <TouchableOpacity style={styles.fab} onPress={openAdd}>
         <Ionicons name={'add' as IoniconName} size={28} color="white" />
@@ -149,6 +228,13 @@ export default function SavingsScreen() {
           onClose={handleSheetClose}
         />
       )}
+
+      {editingTx && (
+        <EditTransactionSheet
+          transaction={editingTx}
+          onClose={() => { setEditingTx(null); dispatch({ type: 'REFRESH' }); }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -156,12 +242,23 @@ export default function SavingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   totalCard: {
-    backgroundColor: '#2563EB', margin: 16, borderRadius: 16,
+    backgroundColor: '#059669', margin: 16, borderRadius: 16,
     padding: 20, alignItems: 'center',
   },
   totalLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
   totalAmount: { color: 'white', fontSize: 32, fontWeight: '700' },
+
+  sectionHeader: {
+    fontSize: 16, fontWeight: '700', color: '#111827',
+    marginHorizontal: 16, marginBottom: 8,
+  },
+
+  inlineEmpty: { paddingHorizontal: 16, paddingVertical: 12 },
+  inlineEmptyText: { fontSize: 14, color: '#9CA3AF' },
+
+  // Accounts list rows
   row: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'white', paddingLeft: 16, paddingRight: 8, paddingVertical: 12,
@@ -172,21 +269,62 @@ const styles = StyleSheet.create({
   accountName: { fontSize: 16, fontWeight: '600', color: '#111827' },
   institution: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   typeBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EFF6FF',
+    alignSelf: 'flex-start', backgroundColor: '#ECFDF5',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 4,
   },
-  typeBadgeText: { fontSize: 11, color: '#2563EB', fontWeight: '500' },
+  typeBadgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
   balance: { fontSize: 16, fontWeight: '600', color: '#111827', marginLeft: 8 },
   rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
   orderBtn: { padding: 4 },
   orderBtnDisabled: { opacity: 0.3 },
   deleteBtn: { padding: 4, marginTop: 4 },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  emptyText: { fontSize: 18, fontWeight: '600', color: '#374151' },
+
+  // Period selector
+  periodScroll: { paddingHorizontal: 16, marginBottom: 8 },
+  periodRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+  periodChip: {
+    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'white',
+  },
+  periodChipActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  periodChipText: { fontSize: 14, color: '#374151' },
+  periodChipTextActive: { color: 'white', fontWeight: '600' },
+
+  // Income card
+  incomeCard: {
+    backgroundColor: 'white', marginHorizontal: 16, marginBottom: 8,
+    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E5E7EB',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  incomeLabel: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
+  incomeAmount: { fontSize: 20, fontWeight: '700', color: '#059669' },
+
+  // Income transaction rows
+  txRow: {
+    flexDirection: 'row', backgroundColor: 'white',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  txLeft: { flex: 1 },
+  txMerchant: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 4 },
+  txMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: {
+    backgroundColor: '#ECFDF5', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  badgeText: { fontSize: 11, color: '#059669', fontWeight: '500' },
+  txDate: { fontSize: 12, color: '#9CA3AF' },
+  txAmount: { fontSize: 15, fontWeight: '600', color: '#059669' },
+
+  // Empty state (income list)
+  empty: { alignItems: 'center', gap: 8, paddingTop: 24, paddingBottom: 24 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },
   emptySub: { fontSize: 14, color: '#9CA3AF' },
+
   fab: {
     position: 'absolute', bottom: 32, right: 24,
-    backgroundColor: '#2563EB', width: 56, height: 56,
+    backgroundColor: '#059669', width: 56, height: 56,
     borderRadius: 28, justifyContent: 'center', alignItems: 'center',
     elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2, shadowRadius: 4,

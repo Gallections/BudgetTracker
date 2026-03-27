@@ -9,11 +9,13 @@ import { parseExpense } from '../../utils/nlpParser';
 import ConfirmationSheet from '../../components/ConfirmationSheet';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+type EntryType = 'expense' | 'income';
 
 export default function HomeScreen() {
   const [text, setText] = useState('');
   const [sheetVisible, setSheetVisible] = useState(false);
   const [frozenText, setFrozenText] = useState('');
+  const [entryType, setEntryType] = useState<EntryType>('expense');
 
   const handleParse = () => {
     const trimmed = text.trim();
@@ -28,13 +30,39 @@ export default function HomeScreen() {
     setFrozenText('');
   };
 
+  const placeholder = entryType === 'expense'
+    ? 'e.g. "spent 45 at Starbucks"'
+    : 'e.g. "received 2000 salary"';
+
+  const typeToggle = (
+    <View style={styles.toggleRow}>
+      <TouchableOpacity
+        style={[styles.toggleBtn, entryType === 'expense' && styles.toggleBtnActive]}
+        onPress={() => setEntryType('expense')}
+      >
+        <Text style={[styles.toggleBtnText, entryType === 'expense' && styles.toggleBtnTextActive]}>
+          Expense
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.toggleBtn, entryType === 'income' && styles.toggleBtnIncome, entryType === 'income' && styles.toggleBtnActiveIncome]}
+        onPress={() => setEntryType('income')}
+      >
+        <Text style={[styles.toggleBtnText, entryType === 'income' && styles.toggleBtnTextActive]}>
+          Income
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   // Voice entry (development build only)
   if (isSpeechRecognitionSupported) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
           <Text style={styles.heading}>PocketLedger</Text>
-          <Text style={styles.sub}>Tap the mic to log an expense</Text>
+          {typeToggle}
+          <Text style={styles.sub}>Tap the mic to log a transaction</Text>
           <TouchableOpacity style={styles.micBtn} activeOpacity={0.8}>
             <Ionicons name={'mic-outline' as IoniconName} size={48} color="white" />
           </TouchableOpacity>
@@ -50,10 +78,19 @@ export default function HomeScreen() {
         style={styles.center}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Ionicons name={'mic-circle-outline' as IoniconName} size={72} color="#2563EB" />
-        <Text style={styles.heading}>Log an Expense</Text>
+        <Ionicons
+          name={'mic-circle-outline' as IoniconName}
+          size={72}
+          color={entryType === 'income' ? '#059669' : '#2563EB'}
+        />
+        <Text style={styles.heading}>
+          {entryType === 'income' ? 'Log Income' : 'Log an Expense'}
+        </Text>
+
+        {typeToggle}
+
         <Text style={styles.sub}>
-          Describe your expense in plain English
+          Describe your {entryType} in plain English
         </Text>
 
         <View style={styles.inputRow}>
@@ -61,7 +98,7 @@ export default function HomeScreen() {
             style={styles.textInput}
             value={text}
             onChangeText={setText}
-            placeholder='e.g. "spent 45 at Starbucks"'
+            placeholder={placeholder}
             placeholderTextColor="#9CA3AF"
             returnKeyType="done"
             onSubmitEditing={handleParse}
@@ -70,7 +107,11 @@ export default function HomeScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.parseBtn, !text.trim() && styles.parseBtnDisabled]}
+          style={[
+            styles.parseBtn,
+            !text.trim() && styles.parseBtnDisabled,
+            entryType === 'income' && text.trim() && styles.parseBtnIncome,
+          ]}
           onPress={handleParse}
           disabled={!text.trim()}
         >
@@ -86,6 +127,7 @@ export default function HomeScreen() {
         <ConfirmationSheet
           transcript={frozenText}
           parsed={parseExpense(frozenText)}
+          type={entryType}
           onClose={handleSheetClose}
         />
       )}
@@ -101,6 +143,18 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 26, fontWeight: '700', color: '#111827' },
   sub: { fontSize: 15, color: '#6B7280', textAlign: 'center' },
+  toggleRow: {
+    flexDirection: 'row', gap: 8,
+    backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4,
+  },
+  toggleBtn: {
+    paddingHorizontal: 24, paddingVertical: 8, borderRadius: 10,
+  },
+  toggleBtnActive: { backgroundColor: '#2563EB' },
+  toggleBtnIncome: {},
+  toggleBtnActiveIncome: { backgroundColor: '#059669' },
+  toggleBtnText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
+  toggleBtnTextActive: { color: 'white' },
   inputRow: { width: '100%' },
   textInput: {
     width: '100%',
@@ -115,6 +169,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, width: '100%', alignItems: 'center',
   },
   parseBtnDisabled: { backgroundColor: '#93C5FD' },
+  parseBtnIncome: { backgroundColor: '#059669' },
   parseBtnText: { color: 'white', fontSize: 16, fontWeight: '600' },
   hint: { fontSize: 12, color: '#9CA3AF', textAlign: 'center' },
   micBtn: {
