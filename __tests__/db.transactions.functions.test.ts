@@ -24,6 +24,7 @@ beforeEach(() => {
 import {
   insertTransaction,
   getTransactions,
+  getMonthlySpendTrend,
   softDeleteTransaction,
   updateTransaction,
 } from '../db/transactions';
@@ -182,6 +183,80 @@ describe('getTransactions', () => {
     const sql: string = mockDb.getAllAsync.mock.calls[0][0];
     expect(sql).not.toContain("type = 'income'");
     expect(sql).not.toContain("type = 'expense'");
+  });
+
+  it('applies search filter LIKE on merchant and notes', async () => {
+    await getTransactions({ search: 'netflix' });
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain('merchant LIKE ?');
+    expect(sql).toContain('notes LIKE ?');
+  });
+
+  it('pushes search term as %term% twice into params', async () => {
+    await getTransactions({ search: 'netflix' });
+    const params: unknown[] = mockDb.getAllAsync.mock.calls[0][1];
+    expect(params).toContain('%netflix%');
+    expect(params.filter(p => p === '%netflix%')).toHaveLength(2);
+  });
+
+  it('does not add search condition when search is undefined', async () => {
+    await getTransactions();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).not.toContain('LIKE');
+  });
+
+  it('does not add search condition when search is empty string', async () => {
+    await getTransactions({ search: '' });
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).not.toContain('LIKE');
+  });
+});
+
+// ─── getMonthlySpendTrend ─────────────────────────────────────────────────────
+
+describe('getMonthlySpendTrend', () => {
+  it('calls getAllAsync once', async () => {
+    await getMonthlySpendTrend();
+    expect(mockDb.getAllAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('SQL uses strftime to group by month', async () => {
+    await getMonthlySpendTrend();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain("strftime('%Y-%m', date)");
+    expect(sql).toContain('GROUP BY month');
+  });
+
+  it('SQL filters out deleted rows', async () => {
+    await getMonthlySpendTrend();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain('deleted_at IS NULL');
+  });
+
+  it('SQL only includes expense rows', async () => {
+    await getMonthlySpendTrend();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain("type = 'expense' OR type IS NULL");
+  });
+
+  it('SQL orders results ascending', async () => {
+    await getMonthlySpendTrend();
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain('ORDER BY month ASC');
+  });
+
+  it('passes a date string as the start date param', async () => {
+    await getMonthlySpendTrend(6);
+    const params: unknown[] = mockDb.getAllAsync.mock.calls[0][1];
+    expect(params).toHaveLength(1);
+    expect(typeof params[0]).toBe('string');
+    expect(params[0] as string).toMatch(/^\d{4}-\d{2}-01$/);
+  });
+
+  it('returns whatever getAllAsync resolves with', async () => {
+    const rows = [{ month: '2026-01', amount: 300 }, { month: '2026-02', amount: 450 }];
+    mockDb.getAllAsync.mockResolvedValueOnce(rows);
+    expect(await getMonthlySpendTrend()).toEqual(rows);
   });
 });
 

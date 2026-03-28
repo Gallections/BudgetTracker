@@ -37,3 +37,28 @@ export function getDateRange(
   // custom
   return { dateFrom: custom?.from ?? toYMD(today), dateTo: custom?.to ?? toYMD(today) };
 }
+
+export function getPreviousDateRange(period: Period): DateRange | null {
+  if (period === 'custom') return null;
+  const today = new Date();
+
+  if (period === 'this_month') {
+    const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const last  = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { dateFrom: toYMD(first), dateTo: toYMD(last) };
+  }
+
+  if (period === 'last_month') {
+    const first = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    const last  = new Date(today.getFullYear(), today.getMonth() - 1, 0);
+    return { dateFrom: toYMD(first), dateTo: toYMD(last) };
+  }
+
+  if (period === 'last_3_months') {
+    const first = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const last  = new Date(today.getFullYear(), today.getMonth() - 3, 0);
+    return { dateFrom: toYMD(first), dateTo: toYMD(last) };
+  }
+
+  return null;
+}

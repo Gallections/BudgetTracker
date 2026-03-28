@@ -1,4 +1,4 @@
-import { getDateRange } from '../utils/dateRanges';
+import { getDateRange, getPreviousDateRange } from '../utils/dateRanges';
 
 // Helper: parse a YYYY-MM-DD string into { y, m, d }
 function parts(ymd: string) {
@@ -114,6 +114,76 @@ describe('getDateRange — custom', () => {
     const { dateFrom, dateTo } = getDateRange('custom');
     expect(dateFrom).toBe(today());
     expect(dateTo).toBe(today());
+  });
+});
+
+// ─── getPreviousDateRange ─────────────────────────────────────────────────────
+
+describe('getPreviousDateRange', () => {
+  it('returns null for custom period', () => {
+    expect(getPreviousDateRange('custom')).toBeNull();
+  });
+
+  it('this_month: dateFrom is 1st of last month', () => {
+    const result = getPreviousDateRange('this_month')!;
+    const now = new Date();
+    const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+    expect(parts(result.dateFrom).d).toBe(1);
+    expect(parts(result.dateFrom).m).toBe(expectedMonth);
+  });
+
+  it('this_month: dateTo is last day of last month', () => {
+    const result = getPreviousDateRange('this_month')!;
+    const now = new Date();
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    expect(parts(result.dateTo).d).toBe(lastDayOfLastMonth);
+  });
+
+  it('this_month: dateFrom <= dateTo', () => {
+    const { dateFrom, dateTo } = getPreviousDateRange('this_month')!;
+    expect(dateFrom <= dateTo).toBe(true);
+  });
+
+  it('last_month: dateFrom is 1st of two months ago', () => {
+    const result = getPreviousDateRange('last_month')!;
+    const now = new Date();
+    const expectedMonth = ((now.getMonth() - 2 + 12) % 12) + 1;
+    expect(parts(result.dateFrom).d).toBe(1);
+    expect(parts(result.dateFrom).m).toBe(expectedMonth);
+  });
+
+  it('last_month: dateFrom <= dateTo', () => {
+    const { dateFrom, dateTo } = getPreviousDateRange('last_month')!;
+    expect(dateFrom <= dateTo).toBe(true);
+  });
+
+  it('last_3_months: dateFrom is 1st of a month 6 months ago', () => {
+    const result = getPreviousDateRange('last_3_months')!;
+    const now = new Date();
+    const expectedMonth = ((now.getMonth() - 6 + 12) % 12) + 1;
+    expect(parts(result.dateFrom).d).toBe(1);
+    expect(parts(result.dateFrom).m).toBe(expectedMonth);
+  });
+
+  it('last_3_months: dateTo is last day of the month 3 months ago', () => {
+    const result = getPreviousDateRange('last_3_months')!;
+    const now = new Date();
+    const lastDayOf3MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 0).getDate();
+    expect(parts(result.dateTo).d).toBe(lastDayOf3MonthsAgo);
+  });
+
+  it('last_3_months: dateFrom <= dateTo', () => {
+    const { dateFrom, dateTo } = getPreviousDateRange('last_3_months')!;
+    expect(dateFrom <= dateTo).toBe(true);
+  });
+
+  it('all non-custom periods return YYYY-MM-DD formatted strings', () => {
+    const periods = ['this_month', 'last_month', 'last_3_months'] as const;
+    for (const p of periods) {
+      const result = getPreviousDateRange(p)!;
+      expect(result.dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(result.dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
   });
 });
 

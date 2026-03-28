@@ -11,6 +11,7 @@ import { softDeleteTransaction, Transaction } from '../../db/transactions';
 import { useApp } from '../../context/AppContext';
 import { Period } from '../../utils/dateRanges';
 import EditTransactionSheet from '../../components/EditTransactionSheet';
+import SearchSheet from '../../components/SearchSheet';
 import { getBudgets } from '../../db/userSettings';
 import { CATEGORIES, Category } from '../../constants/categories';
 import { Colors } from '../../constants/colors';
@@ -57,12 +58,13 @@ export default function DashboardScreen() {
   const [showToPicker, setShowToPicker] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [budgets, setBudgetsData] = useState<Partial<Record<Category, number>>>({});
+  const [searchVisible, setSearchVisible] = useState(false);
 
   const customRange = period === 'custom'
     ? { from: toYMD(customFrom), to: toYMD(customTo) }
     : undefined;
 
-  const { totalSavings, netWorth, recentTransactions, periodTransactions, periodSpend, periodIncome, loading } =
+  const { totalSavings, netWorth, recentTransactions, periodTransactions, periodSpend, periodIncome, prevPeriodSpend, prevPeriodIncome, monthlyTrend, loading } =
     useDashboard(period, customRange);
 
   useEffect(() => {
@@ -111,6 +113,13 @@ export default function DashboardScreen() {
 
   const hasPieData = pieData.length > 0;
   const hasBarData = periodIncome > 0 || periodSpend > 0;
+
+  const calcDelta = (current: number, prev: number): number | null => {
+    if (period === 'custom' || prev === 0) return null;
+    return Math.round(((current - prev) / prev) * 100);
+  };
+  const spendDelta = calcDelta(periodSpend, prevPeriodSpend);
+  const incomeDelta = calcDelta(periodIncome, prevPeriodIncome);
 
   const handleDelete = (tx: Transaction) => {
     Alert.alert('Delete Transaction', `Delete this transaction?`, [
@@ -218,10 +227,20 @@ export default function DashboardScreen() {
         <View style={[styles.summaryCard, styles.summaryCardIncome]}>
           <Text style={styles.summaryLabel}>Income</Text>
           <Text style={[styles.summaryAmount, styles.summaryAmountIncome]}>{fmt(periodIncome)}</Text>
+          {incomeDelta !== null && (
+            <Text style={incomeDelta >= 0 ? styles.deltaUp : styles.deltaDown}>
+              {incomeDelta >= 0 ? '▲' : '▼'} {Math.abs(incomeDelta)}%
+            </Text>
+          )}
         </View>
         <View style={[styles.summaryCard, styles.summaryCardExpense]}>
           <Text style={styles.summaryLabel}>Spend</Text>
           <Text style={[styles.summaryAmount, styles.summaryAmountExpense]}>{fmt(periodSpend)}</Text>
+          {spendDelta !== null && (
+            <Text style={spendDelta > 0 ? styles.deltaDown : styles.deltaUp}>
+              {spendDelta > 0 ? '▲' : '▼'} {Math.abs(spendDelta)}%
+            </Text>
+          )}
         </View>
       </View>
 
@@ -309,6 +328,33 @@ export default function DashboardScreen() {
         )}
       </View>
 
+      {/* 6-Month Spending Trend */}
+      <View style={styles.chartCard}>
+        <Text style={styles.chartTitle}>6-Month Spending Trend</Text>
+        {monthlyTrend.length > 0 ? (
+          <BarChart
+            data={{
+              labels: monthlyTrend.map(t => t.month.slice(5)),
+              datasets: [{ data: monthlyTrend.map(t => Math.round(t.amount)) }],
+            }}
+            width={SCREEN_WIDTH - 64}
+            height={160}
+            chartConfig={{
+              ...chartConfig,
+              color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
+            }}
+            yAxisLabel="$"
+            yAxisSuffix=""
+            fromZero
+            showValuesOnTopOfBars
+          />
+        ) : (
+          <View style={styles.chartEmpty}>
+            <Text style={styles.chartEmptyText}>Not enough data yet</Text>
+          </View>
+        )}
+      </View>
+
       {/* Recent Transactions header */}
       <Text style={styles.sectionHeader}>Recent Transactions</Text>
     </>
@@ -320,6 +366,17 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Dashboard</Text>
+        <TouchableOpacity
+          onPress={() => setSearchVisible(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name={'search-outline' as IoniconName} size={22} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={recentTransactions}
         keyExtractor={item => item.id}
@@ -341,6 +398,10 @@ export default function DashboardScreen() {
           onClose={() => setEditingTx(null)}
         />
       )}
+
+      {searchVisible && (
+        <SearchSheet onClose={() => setSearchVisible(false)} />
+      )}
     </SafeAreaView>
   );
 }
@@ -349,6 +410,18 @@ function makeStyles(c: typeof Colors.light) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background },
+
+    // Screen header
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border,
+    },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: c.text },
+
+    // Delta badges
+    deltaUp: { fontSize: 11, fontWeight: '600', color: '#059669', marginTop: 2 },
+    deltaDown: { fontSize: 11, fontWeight: '600', color: '#EF4444', marginTop: 2 },
 
     // Net Worth
     netWorthCard: {

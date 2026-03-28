@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSavingsAccounts } from '../db/savings';
 import { getRegularExpenses } from '../db/regularExpenses';
-import { getTransactions, Transaction } from '../db/transactions';
+import { getTransactions, getMonthlySpendTrend, Transaction } from '../db/transactions';
 import { useApp } from '../context/AppContext';
-import { Period, getDateRange } from '../utils/dateRanges';
+import { Period, getDateRange, getPreviousDateRange } from '../utils/dateRanges';
 import { calcRecurringContribution } from '../utils/recurringContributions';
 
 export interface DashboardData {
@@ -14,6 +14,9 @@ export interface DashboardData {
   periodTransactions: Transaction[];
   periodSpend: number;
   periodIncome: number;
+  prevPeriodSpend: number;
+  prevPeriodIncome: number;
+  monthlyTrend: { month: string; amount: number }[];
   loading: boolean;
 }
 
@@ -30,17 +33,21 @@ export function useDashboard(
     periodTransactions: [],
     periodSpend: 0,
     periodIncome: 0,
+    prevPeriodSpend: 0,
+    prevPeriodIncome: 0,
+    monthlyTrend: [],
     loading: true,
   });
 
   const load = useCallback(async () => {
     setData(d => ({ ...d, loading: true }));
     const { dateFrom, dateTo } = getDateRange(period, customRange);
+    const prevRange = getPreviousDateRange(period);
 
     // All-time date range for net worth calculation
     const allTimeRange = { dateFrom: '2000-01-01', dateTo: new Date().toISOString().split('T')[0] };
 
-    const [savings, expenses, recent, allIncome, allExpenseTxns, periodExpenseTxns, periodIncomeTxns] =
+    const [savings, expenses, recent, allIncome, allExpenseTxns, periodExpenseTxns, periodIncomeTxns, prevExpenseTxns, prevIncomeTxns, monthlyTrend] =
       await Promise.all([
         getSavingsAccounts(),
         getRegularExpenses(),
@@ -49,6 +56,9 @@ export function useDashboard(
         getTransactions({ type: 'expense' }),
         getTransactions({ type: 'expense', dateFrom, dateTo }),
         getTransactions({ type: 'income', dateFrom, dateTo }),
+        prevRange ? getTransactions({ type: 'expense', dateFrom: prevRange.dateFrom, dateTo: prevRange.dateTo }) : Promise.resolve([]),
+        prevRange ? getTransactions({ type: 'income', dateFrom: prevRange.dateFrom, dateTo: prevRange.dateTo }) : Promise.resolve([]),
+        getMonthlySpendTrend(6),
       ]);
 
     const accountBalances = savings.reduce((sum, a) => sum + a.balance, 0);
@@ -63,6 +73,14 @@ export function useDashboard(
       calcRecurringContribution(expenses, { dateFrom, dateTo });
     const periodIncome = periodIncomeTxns.reduce((sum, t) => sum + t.amount, 0);
 
+    const prevPeriodSpend = prevRange
+      ? prevExpenseTxns.reduce((sum, t) => sum + t.amount, 0) +
+        calcRecurringContribution(expenses, { dateFrom: prevRange.dateFrom, dateTo: prevRange.dateTo })
+      : 0;
+    const prevPeriodIncome = prevRange
+      ? prevIncomeTxns.reduce((sum, t) => sum + t.amount, 0)
+      : 0;
+
     setData({
       totalSavings: accountBalances,
       totalDebts: recurringAllTime,
@@ -73,6 +91,9 @@ export function useDashboard(
       ),
       periodSpend,
       periodIncome,
+      prevPeriodSpend,
+      prevPeriodIncome,
+      monthlyTrend,
       loading: false,
     });
   }, [period, customRange?.from, customRange?.to, state.refreshKey]);

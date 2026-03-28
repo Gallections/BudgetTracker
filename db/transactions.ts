@@ -38,6 +38,7 @@ export async function getTransactions(options?: {
   dateFrom?: string;
   dateTo?: string;
   type?: 'income' | 'expense';
+  search?: string;
 }): Promise<Transaction[]> {
   const db = await getDatabase();
   const conditions: string[] = ['deleted_at IS NULL'];
@@ -60,12 +61,37 @@ export async function getTransactions(options?: {
     conditions.push('date <= ?');
     params.push(options.dateTo);
   }
+  if (options?.search) {
+    const s = `%${options.search}%`;
+    conditions.push('(merchant LIKE ? OR notes LIKE ?)');
+    params.push(s, s);
+  }
 
   const where = conditions.join(' AND ');
   const limit = options?.limit ? ` LIMIT ${options.limit}` : '';
   const sql = `SELECT * FROM transactions WHERE ${where} ORDER BY date DESC, created_at DESC${limit}`;
 
   return db.getAllAsync<Transaction>(sql, params);
+}
+
+export async function getMonthlySpendTrend(months = 6): Promise<{ month: string; amount: number }[]> {
+  const db = await getDatabase();
+  const today = new Date();
+  const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
+  const y = startDate.getFullYear();
+  const m = String(startDate.getMonth() + 1).padStart(2, '0');
+  const dateFrom = `${y}-${m}-01`;
+
+  return db.getAllAsync<{ month: string; amount: number }>(
+    `SELECT strftime('%Y-%m', date) as month, SUM(amount) as amount
+     FROM transactions
+     WHERE deleted_at IS NULL
+       AND (type = 'expense' OR type IS NULL)
+       AND date >= ?
+     GROUP BY month
+     ORDER BY month ASC`,
+    [dateFrom]
+  );
 }
 
 export async function softDeleteTransaction(id: string): Promise<void> {
