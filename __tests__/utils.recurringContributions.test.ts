@@ -15,6 +15,7 @@ function makeExpense(overrides: Partial<RegularExpense> = {}): RegularExpense {
     sort_order: 0,
     deleted_at: null,
     start_date: '2025-01-01',
+    last_posted_at: null,
     ...overrides,
   };
 }

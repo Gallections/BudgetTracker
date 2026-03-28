@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SUPPORTED_CURRENCIES } from '../../constants/currencies';
-import { CATEGORIES, Category } from '../../constants/categories';
+import { CATEGORIES } from '../../constants/categories';
 import { Colors } from '../../constants/colors';
 import {
   setBaseCurrency, getBudgets, setBudget, clearBudget,
@@ -27,7 +27,7 @@ export default function SettingsScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [loading, setLoading] = useState(true);
-  const [budgets, setBudgetsState] = useState<Partial<Record<Category, string>>>({});
+  const [budgets, setBudgetsState] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
 
@@ -44,9 +44,9 @@ export default function SettingsScreen() {
 
   const loadSettings = useCallback(async () => {
     const [stored, cats] = await Promise.all([getBudgets(), getCustomCategories()]);
-    const asStrings: Partial<Record<Category, string>> = {};
+    const asStrings: Record<string, string> = {};
     for (const [cat, val] of Object.entries(stored)) {
-      asStrings[cat as Category] = val.toString();
+      asStrings[cat] = val.toString();
     }
     setBudgetsState(asStrings);
     setCustomCategories(cats);
@@ -70,7 +70,8 @@ export default function SettingsScreen() {
   const handleSaveBudgets = async () => {
     setSaving(true);
     try {
-      for (const cat of CATEGORIES) {
+      const allCategories = [...CATEGORIES, ...customCategories.map(c => c.name)];
+      for (const cat of allCategories) {
         const raw = budgets[cat];
         if (raw === undefined || raw.trim() === '') {
           await clearBudget(cat);
@@ -251,7 +252,7 @@ export default function SettingsScreen() {
           Set a monthly spending limit per category. Leave blank for no limit.
         </Text>
 
-        {CATEGORIES.filter(c => c !== 'Uncategorized').map(cat => (
+        {[...CATEGORIES.filter(c => c !== 'Uncategorized'), ...customCategories.map(c => c.name)].map(cat => (
           <View key={cat} style={styles.budgetRow}>
             <Text style={styles.budgetLabel}>{cat}</Text>
             <View style={styles.budgetInputWrap}>

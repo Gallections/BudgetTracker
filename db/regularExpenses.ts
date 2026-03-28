@@ -14,6 +14,7 @@ export interface RegularExpense {
   sort_order: number;
   deleted_at: string | null;
   start_date: string | null;
+  last_posted_at: string | null;
 }
 
 export type Frequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually';
@@ -36,7 +37,7 @@ export async function getRegularExpenses(): Promise<RegularExpense[]> {
 }
 
 export async function upsertRegularExpense(
-  expense: Omit<RegularExpense, 'id' | 'deleted_at' | 'start_date'> & { id?: string; start_date?: string | null }
+  expense: Omit<RegularExpense, 'id' | 'deleted_at' | 'start_date' | 'last_posted_at'> & { id?: string; start_date?: string | null }
 ): Promise<RegularExpense> {
   const db = await getDatabase();
   const isNew = !expense.id;
@@ -63,7 +64,7 @@ export async function upsertRegularExpense(
     ]
   );
 
-  return { ...expense, id, deleted_at: null, start_date: start_date ?? null };
+  return { ...expense, id, deleted_at: null, start_date: start_date ?? null, last_posted_at: null };
 }
 
 export async function softDeleteRegularExpense(id: string): Promise<void> {
@@ -71,6 +72,15 @@ export async function softDeleteRegularExpense(id: string): Promise<void> {
   await db.runAsync(
     'UPDATE regular_expenses SET deleted_at = ? WHERE id = ?',
     [new Date().toISOString(), id]
+  );
+}
+
+export async function markExpensePosted(id: string): Promise<void> {
+  const db = await getDatabase();
+  const month = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+  await db.runAsync(
+    'UPDATE regular_expenses SET last_posted_at = ? WHERE id = ?',
+    [month, id]
   );
 }
 

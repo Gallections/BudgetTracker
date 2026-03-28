@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
@@ -9,13 +9,16 @@ import { useTheme } from '../../hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import {
   RegularExpense, getRegularExpenses, softDeleteRegularExpense,
-  updateExpensesOrder, FREQUENCY_MONTHLY_MULTIPLIER, Frequency,
+  updateExpensesOrder, FREQUENCY_MONTHLY_MULTIPLIER, Frequency, markExpensePosted,
 } from '../../db/regularExpenses';
 import { Transaction, getTransactions } from '../../db/transactions';
 import { useApp } from '../../context/AppContext';
 import AddEditExpenseSheet from '../../components/AddEditExpenseSheet';
 import EditTransactionSheet from '../../components/EditTransactionSheet';
+import DueExpenseSheet from '../../components/DueExpenseSheet';
 import { Period, getDateRange } from '../../utils/dateRanges';
+import { getDueExpenses } from '../../utils/dueExpenses';
+import { useExchangeRates } from '../../hooks/useExchangeRates';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 type SubTab = 'one_time' | 'recurring';
@@ -52,6 +55,10 @@ export default function ExpensesScreen() {
   const [editingExpense, setEditingExpense] = useState<RegularExpense | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [dueSheetVisible, setDueSheetVisible] = useState(false);
+  const dueSheetShown = useRef(false);
+  const { rates } = useExchangeRates(state.baseCurrency);
+  const dueExpenses = useMemo(() => getDueExpenses(expenses), [expenses]);
 
   const loadData = useCallback(async () => {
     try {
@@ -73,7 +80,11 @@ export default function ExpensesScreen() {
 
   useFocusEffect(useCallback(() => {
     if (state.dbReady) loadData();
-  }, [state.dbReady, loadData]));
+    if (dueExpenses.length > 0 && !dueSheetShown.current) {
+      dueSheetShown.current = true;
+      setDueSheetVisible(true);
+    }
+  }, [state.dbReady, loadData, dueExpenses.length]));
 
   const oneTimeTotal = oneTimeTxns.reduce((sum, t) => sum + t.amount, 0);
   const monthlyTotal = expenses.reduce((sum, e) => {
@@ -160,6 +171,11 @@ export default function ExpensesScreen() {
                 </Text>
               </View>
             </View>
+            {item.outstanding_balance != null && item.outstanding_balance > 0 && (
+              <Text style={styles.outstandingText}>
+                Balance owing: {fmt(item.outstanding_balance, item.currency)}
+              </Text>
+            )}
           </View>
           <View style={styles.amountCol}>
             <Text style={styles.amount}>{fmt(item.amount, item.currency)}</Text>
@@ -202,7 +218,7 @@ export default function ExpensesScreen() {
         <Text style={styles.spendLabel}>
           {EXPENSE_PERIODS.find(p => p.key === oneTimePeriod)?.label} Spend
         </Text>
-        <Text style={styles.spendAmount}>{fmt(oneTimeTotal)}</Text>
+        <Text style={styles.spendAmount}>{fmt(oneTimeTotal, state.baseCurrency)}</Text>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
@@ -226,7 +242,7 @@ export default function ExpensesScreen() {
   const RecurringHeader = () => (
     <View style={styles.spendCard}>
       <Text style={styles.spendLabel}>Est. Monthly Total</Text>
-      <Text style={styles.spendAmount}>{fmt(monthlyTotal)}</Text>
+      <Text style={styles.spendAmount}>{fmt(monthlyTotal, state.baseCurrency)}</Text>
     </View>
   );
 
@@ -307,6 +323,16 @@ export default function ExpensesScreen() {
           onClose={() => { setEditingTx(null); dispatch({ type: 'REFRESH' }); }}
         />
       )}
+
+      {dueSheetVisible && (
+        <DueExpenseSheet
+          expenses={dueExpenses}
+          baseCurrency={state.baseCurrency}
+          rates={rates}
+          onClose={() => setDueSheetVisible(false)}
+          onPosted={() => { setDueSheetVisible(false); dispatch({ type: 'REFRESH' }); }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -375,6 +401,7 @@ function makeStyles(c: typeof Colors.light) {
     amountCol: { alignItems: 'flex-end' },
     amount: { fontSize: 16, fontWeight: '600', color: c.text },
     overdueLabel: { fontSize: 11, color: '#F59E0B', fontWeight: '600', marginTop: 2 },
+    outstandingText: { fontSize: 11, color: '#B45309', marginTop: 2 },
     rowActions: { flexDirection: 'column', alignItems: 'center', gap: 2 },
     orderBtn: { padding: 4 },
     orderBtnDisabled: { opacity: 0.3 },

@@ -13,9 +13,10 @@ import { Period } from '../../utils/dateRanges';
 import EditTransactionSheet from '../../components/EditTransactionSheet';
 import SearchSheet from '../../components/SearchSheet';
 import { getBudgets } from '../../db/userSettings';
-import { CATEGORIES, Category } from '../../constants/categories';
+import { CATEGORIES } from '../../constants/categories';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../hooks/useTheme';
+import { calcSpendingPace } from '../../utils/spendingPace';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -57,7 +58,7 @@ export default function DashboardScreen() {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [budgets, setBudgetsData] = useState<Partial<Record<Category, number>>>({});
+  const [budgets, setBudgetsData] = useState<Record<string, number>>({});
   const [searchVisible, setSearchVisible] = useState(false);
 
   const customRange = period === 'custom'
@@ -114,6 +115,11 @@ export default function DashboardScreen() {
   const hasPieData = pieData.length > 0;
   const hasBarData = periodIncome > 0 || periodSpend > 0;
 
+  const pace = calcSpendingPace(budgets, spendByCategory);
+  const overBudgetCategories = Object.keys(budgets).filter(
+    cat => (spendByCategory[cat] ?? 0) > budgets[cat]
+  );
+
   const calcDelta = (current: number, prev: number): number | null => {
     if (period === 'custom' || prev === 0) return null;
     return Math.round(((current - prev) / prev) * 100);
@@ -169,11 +175,11 @@ export default function DashboardScreen() {
       {/* Net Worth Card */}
       <View style={styles.netWorthCard}>
         <Text style={styles.netWorthLabel}>Net Worth</Text>
-        <Text style={styles.netWorthAmount}>{fmt(netWorth)}</Text>
+        <Text style={styles.netWorthAmount}>{fmt(netWorth, state.baseCurrency)}</Text>
         <View style={styles.netWorthRow}>
           <View style={styles.netWorthSub}>
             <Ionicons name={'wallet-outline' as IoniconName} size={14} color="rgba(255,255,255,0.8)" />
-            <Text style={styles.netWorthSubText}>Accounts {fmt(totalSavings)}</Text>
+            <Text style={styles.netWorthSubText}>Accounts {fmt(totalSavings, state.baseCurrency)}</Text>
           </View>
         </View>
       </View>
@@ -226,7 +232,7 @@ export default function DashboardScreen() {
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, styles.summaryCardIncome]}>
           <Text style={styles.summaryLabel}>Income</Text>
-          <Text style={[styles.summaryAmount, styles.summaryAmountIncome]}>{fmt(periodIncome)}</Text>
+          <Text style={[styles.summaryAmount, styles.summaryAmountIncome]}>{fmt(periodIncome, state.baseCurrency)}</Text>
           {incomeDelta !== null && (
             <Text style={incomeDelta >= 0 ? styles.deltaUp : styles.deltaDown}>
               {incomeDelta >= 0 ? '▲' : '▼'} {Math.abs(incomeDelta)}%
@@ -235,7 +241,7 @@ export default function DashboardScreen() {
         </View>
         <View style={[styles.summaryCard, styles.summaryCardExpense]}>
           <Text style={styles.summaryLabel}>Spend</Text>
-          <Text style={[styles.summaryAmount, styles.summaryAmountExpense]}>{fmt(periodSpend)}</Text>
+          <Text style={[styles.summaryAmount, styles.summaryAmountExpense]}>{fmt(periodSpend, state.baseCurrency)}</Text>
           {spendDelta !== null && (
             <Text style={spendDelta > 0 ? styles.deltaDown : styles.deltaUp}>
               {spendDelta > 0 ? '▲' : '▼'} {Math.abs(spendDelta)}%
@@ -243,6 +249,33 @@ export default function DashboardScreen() {
           )}
         </View>
       </View>
+
+      {/* Spending Pace Card */}
+      {period === 'this_month' && pace !== null && (
+        <View style={styles.paceCard}>
+          <View style={styles.paceTitleRow}>
+            <Text style={styles.paceTitle}>Monthly Budget Pace</Text>
+            <Text style={styles.paceDays}>{pace.daysRemaining} days left</Text>
+          </View>
+          <Text style={styles.paceNumbers}>
+            {fmt(pace.totalSpent, state.baseCurrency)} spent of {fmt(pace.totalBudget, state.baseCurrency)} budget
+          </Text>
+          <View style={styles.paceTrack}>
+            <View style={[
+              styles.paceFill,
+              { width: `${pace.budgetPct * 100}%` as unknown as number },
+              pace.isOverPace && styles.paceFillOver,
+            ]} />
+            <View style={[
+              styles.paceDayMark,
+              { left: `${pace.dayPct * 100}%` as unknown as number },
+            ]} />
+          </View>
+          <Text style={[styles.paceStatus, pace.isOverPace && styles.paceStatusOver]}>
+            {pace.isOverPace ? '⚡ Spending faster than planned' : '✓ On pace'}
+          </Text>
+        </View>
+      )}
 
       {/* Spending by Category chart */}
       <View style={styles.chartCard}>
@@ -292,11 +325,31 @@ export default function DashboardScreen() {
         )}
       </View>
 
+      {/* Over-Budget Alert */}
+      {overBudgetCategories.length > 0 && (
+        <View style={styles.alertCard}>
+          <View style={styles.alertHeader}>
+            <Ionicons name={'warning-outline' as IoniconName} size={16} color="#F59E0B" />
+            <Text style={styles.alertTitle}>Over Budget</Text>
+          </View>
+          {overBudgetCategories.map(cat => (
+            <View key={cat} style={styles.alertRow}>
+              <Text style={styles.alertCat}>{cat}</Text>
+              <Text style={styles.alertAmount}>
+                {fmt(spendByCategory[cat], state.baseCurrency)} / {fmt(budgets[cat], state.baseCurrency)}
+                {'  '}
+                <Text style={styles.alertOver}>+{fmt((spendByCategory[cat] ?? 0) - budgets[cat], state.baseCurrency)}</Text>
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Budget Gauges */}
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>Budget Progress</Text>
         {Object.keys(budgets).length > 0 ? (
-          CATEGORIES.filter(cat => budgets[cat] !== undefined).map(cat => {
+          Object.keys(budgets).map(cat => {
             const budget = budgets[cat] ?? 0;
             const spent = spendByCategory[cat] ?? 0;
             const pct = budget > 0 ? Math.min(spent / budget, 1) : 0;
@@ -306,7 +359,7 @@ export default function DashboardScreen() {
                 <View style={styles.gaugeLabelRow}>
                   <Text style={styles.gaugeLabel}>{cat}</Text>
                   <Text style={[styles.gaugeAmount, over && styles.gaugeAmountOver]}>
-                    {fmt(spent)} / {fmt(budget)}
+                    {fmt(spent, state.baseCurrency)} / {fmt(budget, state.baseCurrency)}
                   </Text>
                 </View>
                 <View style={styles.gaugeTrack}>
@@ -526,6 +579,43 @@ function makeStyles(c: typeof Colors.light) {
     txRight: { alignItems: 'flex-end', gap: 6 },
     txAmount: { fontSize: 15, fontWeight: '600', color: '#EF4444' },
     txAmountIncome: { color: '#059669' },
+
+    // Spending pace card
+    paceCard: {
+      backgroundColor: c.surface, marginHorizontal: 16, marginBottom: 12,
+      borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border,
+    },
+    paceTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    paceTitle: { fontSize: 15, fontWeight: '700', color: c.text },
+    paceDays: { fontSize: 13, color: c.textSecondary },
+    paceNumbers: { fontSize: 13, color: c.textSecondary, marginBottom: 8 },
+    paceTrack: {
+      height: 10, backgroundColor: c.border, borderRadius: 5,
+      overflow: 'hidden', position: 'relative', marginBottom: 8,
+    },
+    paceFill: { height: 10, backgroundColor: c.primary, borderRadius: 5 },
+    paceFillOver: { backgroundColor: '#EF4444' },
+    paceDayMark: {
+      position: 'absolute', top: 0, width: 2, height: 10, backgroundColor: c.text, opacity: 0.5,
+    },
+    paceStatus: { fontSize: 12, fontWeight: '600', color: '#059669' },
+    paceStatusOver: { color: '#EF4444' },
+
+    // Over-budget alert card
+    alertCard: {
+      marginHorizontal: 16, marginBottom: 12,
+      borderRadius: 12, padding: 14,
+      backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FCD34D',
+    },
+    alertHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    alertTitle: { fontSize: 14, fontWeight: '700', color: '#92400E' },
+    alertRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingVertical: 3,
+    },
+    alertCat: { fontSize: 13, color: '#92400E' },
+    alertAmount: { fontSize: 12, color: '#92400E' },
+    alertOver: { fontWeight: '700', color: '#EF4444' },
 
     // Empty state
     empty: { alignItems: 'center', gap: 8, paddingTop: 48 },

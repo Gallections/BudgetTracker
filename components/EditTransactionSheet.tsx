@@ -9,6 +9,8 @@ import { Transaction, updateTransaction, softDeleteTransaction } from '../db/tra
 import { CATEGORIES, Category } from '../constants/categories';
 import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import { useApp } from '../context/AppContext';
+import { useExchangeRates } from '../hooks/useExchangeRates';
+import { toBaseCurrency } from '../utils/currencyConvert';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -18,7 +20,8 @@ interface Props {
 }
 
 export default function EditTransactionSheet({ transaction, onClose }: Props) {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
+  const { rates } = useExchangeRates(state.baseCurrency);
 
   const [amount, setAmount] = useState(transaction.amount.toString());
   const [currency, setCurrency] = useState(transaction.currency);
@@ -42,7 +45,7 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
         id: transaction.id,
         amount: amountNum,
         currency,
-        amount_in_base_currency: amountNum,
+        amount_in_base_currency: toBaseCurrency(amountNum, currency, state.baseCurrency, rates),
         category,
         merchant: merchant.trim(),
         notes: notes.trim() || null,

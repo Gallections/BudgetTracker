@@ -11,6 +11,8 @@ import { CATEGORIES } from '../constants/categories';
 import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import { useApp } from '../context/AppContext';
 import { setMerchantOverride } from '../db/userSettings';
+import { useExchangeRates } from '../hooks/useExchangeRates';
+import { toBaseCurrency } from '../utils/currencyConvert';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -23,7 +25,8 @@ interface Props {
 }
 
 export default function ConfirmationSheet({ transcript, parsed, onClose, type = 'expense', customCategories = [] }: Props) {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
+  const { rates } = useExchangeRates(state.baseCurrency);
 
   const [amount, setAmount] = useState(parsed.amount?.toString() ?? '');
   const [currency, setCurrency] = useState(parsed.currency);
@@ -52,7 +55,7 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
       await insertTransaction({
         amount: amountNum,
         currency,
-        amount_in_base_currency: amountNum, // placeholder — Phase 5 adds real conversion
+        amount_in_base_currency: toBaseCurrency(amountNum, currency, state.baseCurrency, rates),
         category,
         merchant: trimmedMerchant,
         notes: notes.trim() || null,

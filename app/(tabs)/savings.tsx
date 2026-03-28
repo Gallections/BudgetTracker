@@ -162,7 +162,7 @@ export default function SavingsScreen() {
       {/* Accounts section */}
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total Accounts</Text>
-        <Text style={styles.totalAmount}>{fmt(totalBalanceCAD)}</Text>
+        <Text style={styles.totalAmount}>{fmt(totalBalanceCAD, state.baseCurrency)}</Text>
       </View>
       <Text style={styles.sectionHeader}>Accounts</Text>
 
@@ -201,7 +201,7 @@ export default function SavingsScreen() {
         <Text style={styles.incomeLabel}>
           {INCOME_PERIODS.find(p => p.key === incomePeriod)?.label} Income
         </Text>
-        <Text style={styles.incomeAmount}>{fmt(totalIncome)}</Text>
+        <Text style={styles.incomeAmount}>{fmt(totalIncome, state.baseCurrency)}</Text>
       </View>
     </>
   );

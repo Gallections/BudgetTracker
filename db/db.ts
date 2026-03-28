@@ -37,6 +37,15 @@ async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
   } catch {
     // Column already exists — idempotent
   }
+
+  // Migration v4: track last auto-post month per recurring expense
+  try {
+    await database.execAsync(
+      `ALTER TABLE regular_expenses ADD COLUMN last_posted_at TEXT`
+    );
+  } catch {
+    // Column already exists — idempotent
+  }
 }
 
 export async function initDatabase(): Promise<void> {

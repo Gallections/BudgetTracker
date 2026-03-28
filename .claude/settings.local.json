@@ -23,7 +23,8 @@
       "Bash(ls -la /c/coding/Apps/BudgetTracker/app/\\\\\\(tabs\\\\\\)/)",
       "Bash(grep -r categories C:codingAppsBudgetTracker/db --include=*.ts)",
       "Bash(find /c/coding/Apps/BudgetTracker -type f -name *PRD* -o -name *prd*)",
-      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /c/coding/Apps/BudgetTracker --include=*.ts --include=*.tsx)"
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /c/coding/Apps/BudgetTracker --include=*.ts --include=*.tsx)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -1,5 +1,4 @@
 import { getDatabase } from './db';
-import { Category } from '../constants/categories';
 
 export async function getUserSetting(key: string): Promise<string | null> {
   const db = await getDatabase();
@@ -26,25 +25,25 @@ export async function setBaseCurrency(currency: string): Promise<void> {
   return setUserSetting('base_currency', currency);
 }
 
-export async function getBudgets(): Promise<Partial<Record<Category, number>>> {
+export async function getBudgets(): Promise<Record<string, number>> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'budget_%'"
   );
-  const result: Partial<Record<Category, number>> = {};
+  const result: Record<string, number> = {};
   for (const row of rows) {
-    const category = row.key.replace('budget_', '') as Category;
+    const category = row.key.replace('budget_', '');
     const amount = parseFloat(row.value);
     if (!isNaN(amount)) result[category] = amount;
   }
   return result;
 }
 
-export async function setBudget(category: Category, amount: number): Promise<void> {
+export async function setBudget(category: string, amount: number): Promise<void> {
   return setUserSetting(`budget_${category}`, amount.toString());
 }
 
-export async function clearBudget(category: Category): Promise<void> {
+export async function clearBudget(category: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM user_settings WHERE key = ?', [`budget_${category}`]);
 }
