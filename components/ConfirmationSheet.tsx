@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Modal, TouchableOpacity,
   ScrollView, Alert, KeyboardAvoidingView, Platform,
@@ -10,9 +10,10 @@ import { ParsedExpense } from '../utils/nlpParser';
 import { CATEGORIES } from '../constants/categories';
 import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import { useApp } from '../context/AppContext';
-import { setMerchantOverride } from '../db/userSettings';
+import { setMerchantOverride, getDefaultAccountId } from '../db/userSettings';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 import { toBaseCurrency } from '../utils/currencyConvert';
+import { getSavingsAccounts, SavingsAccount, adjustAccountBalance } from '../db/savings';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -36,6 +37,15 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
+  const [sourceAccountId, setSourceAccountId] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([getSavingsAccounts(), getDefaultAccountId()]).then(([accts, defaultId]) => {
+      setAccounts(accts);
+      setSourceAccountId(defaultId);
+    });
+  }, []);
 
   const handleSave = async () => {
     const amountNum = parseFloat(amount);
@@ -52,16 +62,21 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
         await setMerchantOverride(trimmedMerchant, category);
       }
 
+      const amountInBase = toBaseCurrency(amountNum, currency, state.baseCurrency, rates);
       await insertTransaction({
         amount: amountNum,
         currency,
-        amount_in_base_currency: toBaseCurrency(amountNum, currency, state.baseCurrency, rates),
+        amount_in_base_currency: amountInBase,
         category,
         merchant: trimmedMerchant,
         notes: notes.trim() || null,
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type,
+        source_account_id: type === 'expense' ? sourceAccountId : null,
       });
+      if (type === 'expense' && sourceAccountId) {
+        await adjustAccountBalance(sourceAccountId, -amountInBase);
+      }
       dispatch({ type: 'REFRESH' });
       onClose();
     } catch {
@@ -176,6 +191,34 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
               placeholder="Optional notes..."
             />
           </Field>
+
+          {type === 'expense' && accounts.length > 0 && (
+            <Field label="From account">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chipRow}>
+                  <TouchableOpacity
+                    style={[styles.chip, sourceAccountId === null && styles.chipActive]}
+                    onPress={() => setSourceAccountId(null)}
+                  >
+                    <Text style={[styles.chipText, sourceAccountId === null && styles.chipTextActive]}>
+                      None
+                    </Text>
+                  </TouchableOpacity>
+                  {accounts.map(a => (
+                    <TouchableOpacity
+                      key={a.id}
+                      style={[styles.chip, sourceAccountId === a.id && styles.chipActive]}
+                      onPress={() => setSourceAccountId(a.id)}
+                    >
+                      <Text style={[styles.chipText, sourceAccountId === a.id && styles.chipTextActive]}>
+                        {a.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </Field>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>

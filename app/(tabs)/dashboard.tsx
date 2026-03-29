@@ -17,6 +17,7 @@ import { CATEGORIES } from '../../constants/categories';
 import { Colors } from '../../constants/colors';
 import { useTheme } from '../../hooks/useTheme';
 import { calcSpendingPace } from '../../utils/spendingPace';
+import { calcMonthlyReport } from '../../utils/monthlyReport';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -60,12 +61,13 @@ export default function DashboardScreen() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [budgets, setBudgetsData] = useState<Record<string, number>>({});
   const [searchVisible, setSearchVisible] = useState(false);
+  const [reportExpanded, setReportExpanded] = useState(true);
 
   const customRange = period === 'custom'
     ? { from: toYMD(customFrom), to: toYMD(customTo) }
     : undefined;
 
-  const { totalSavings, netWorth, recentTransactions, periodTransactions, periodSpend, periodIncome, prevPeriodSpend, prevPeriodIncome, monthlyTrend, loading } =
+  const { totalSavings, netWorth, recentTransactions, periodTransactions, prevPeriodTransactions, periodSpend, periodIncome, prevPeriodSpend, prevPeriodIncome, monthlyTrend, loading } =
     useDashboard(period, customRange);
 
   useEffect(() => {
@@ -116,6 +118,9 @@ export default function DashboardScreen() {
   const hasBarData = periodIncome > 0 || periodSpend > 0;
 
   const pace = calcSpendingPace(budgets, spendByCategory);
+  const monthlyReport = period !== 'custom'
+    ? calcMonthlyReport(periodTransactions, prevPeriodTransactions, periodIncome, periodSpend, prevPeriodIncome, prevPeriodSpend)
+    : null;
   const overBudgetCategories = Object.keys(budgets).filter(
     cat => (spendByCategory[cat] ?? 0) > budgets[cat]
   );
@@ -408,6 +413,103 @@ export default function DashboardScreen() {
         )}
       </View>
 
+      {/* Monthly Report */}
+      {monthlyReport !== null && (
+        <View style={styles.chartCard}>
+          <TouchableOpacity
+            style={styles.reportHeaderRow}
+            onPress={() => setReportExpanded(v => !v)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.chartTitle}>Monthly Report</Text>
+            <Ionicons
+              name={(reportExpanded ? 'chevron-up' : 'chevron-down') as IoniconName}
+              size={18}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {reportExpanded && (
+            <>
+              {/* Savings Rate */}
+              {monthlyReport.savingsRate !== null && (
+                <View style={styles.reportRow}>
+                  <Text style={styles.reportLabel}>Savings rate</Text>
+                  <View style={styles.reportValueRow}>
+                    <Text style={styles.reportValue}>
+                      {Math.round(monthlyReport.savingsRate * 100)}%
+                    </Text>
+                    {monthlyReport.prevSavingsRate !== null && (
+                      <Text style={
+                        monthlyReport.savingsRate >= monthlyReport.prevSavingsRate
+                          ? styles.reportUp : styles.reportDown
+                      }>
+                        {monthlyReport.savingsRate >= monthlyReport.prevSavingsRate ? ' ▲' : ' ▼'}
+                        {Math.abs(Math.round((monthlyReport.savingsRate - monthlyReport.prevSavingsRate) * 100))}pp
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Top Merchants */}
+              {monthlyReport.topMerchants.length > 0 && (
+                <>
+                  <Text style={styles.reportSection}>Top Merchants</Text>
+                  {monthlyReport.topMerchants.map((m, i) => (
+                    <View key={i} style={styles.reportRow}>
+                      <Text style={styles.reportLabel}>{i + 1}. {m.merchant}</Text>
+                      <Text style={styles.reportValue}>{fmt(m.amount, state.baseCurrency)}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {/* Category Shifts */}
+              {(monthlyReport.categoryIncreases.length > 0 || monthlyReport.categoryDecreases.length > 0) && (
+                <>
+                  <Text style={styles.reportSection}>Category Shifts</Text>
+                  {monthlyReport.categoryIncreases.map((c, i) => (
+                    <View key={i} style={styles.reportRow}>
+                      <Text style={styles.reportLabel}>↑ {c.category}</Text>
+                      <Text style={[styles.reportValue, styles.reportUp]}>
+                        +{fmt(c.delta, state.baseCurrency)}
+                      </Text>
+                    </View>
+                  ))}
+                  {monthlyReport.categoryDecreases.map((c, i) => (
+                    <View key={i} style={styles.reportRow}>
+                      <Text style={styles.reportLabel}>↓ {c.category}</Text>
+                      <Text style={[styles.reportValue, styles.reportDown]}>
+                        {fmt(c.delta, state.baseCurrency)}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {/* Day-of-Week Spend */}
+              <Text style={styles.reportSection}>Day-of-Week Spend</Text>
+              <BarChart
+                data={{
+                  labels: monthlyReport.dayOfWeekSpend.map(d => d.day),
+                  datasets: [{ data: monthlyReport.dayOfWeekSpend.map(d => Math.round(d.avg)) }],
+                }}
+                width={SCREEN_WIDTH - 64}
+                height={140}
+                chartConfig={{
+                  ...chartConfig,
+                  color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+                }}
+                yAxisLabel="$"
+                yAxisSuffix=""
+                fromZero
+              />
+            </>
+          )}
+        </View>
+      )}
+
       {/* Recent Transactions header */}
       <Text style={styles.sectionHeader}>Recent Transactions</Text>
     </>
@@ -616,6 +718,20 @@ function makeStyles(c: typeof Colors.light) {
     alertCat: { fontSize: 13, color: '#92400E' },
     alertAmount: { fontSize: 12, color: '#92400E' },
     alertOver: { fontWeight: '700', color: '#EF4444' },
+
+    // Monthly Report
+    reportHeaderRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+    },
+    reportRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4,
+    },
+    reportValueRow: { flexDirection: 'row', alignItems: 'center' },
+    reportLabel: { fontSize: 13, color: c.text, flex: 1 },
+    reportValue: { fontSize: 13, fontWeight: '600', color: c.text },
+    reportSection: { fontSize: 12, fontWeight: '700', color: c.textSecondary, marginTop: 12, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+    reportUp: { fontSize: 12, fontWeight: '600', color: '#059669' },
+    reportDown: { fontSize: 12, fontWeight: '600', color: '#EF4444' },
 
     // Empty state
     empty: { alignItems: 'center', gap: 8, paddingTop: 48 },

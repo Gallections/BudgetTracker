@@ -22,6 +22,7 @@ const makeTx = (overrides: Partial<Transaction> = {}): Transaction => ({
   created_at: '2026-03-26T10:00:00.000Z',
   deleted_at: null,
   type: 'expense',
+  source_account_id: null,
   ...overrides,
 });
 

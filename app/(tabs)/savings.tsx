@@ -8,9 +8,11 @@ import { Colors } from '../../constants/colors';
 import { useTheme } from '../../hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { SavingsAccount, getSavingsAccounts, softDeleteSavingsAccount, updateSavingsOrder } from '../../db/savings';
+import { SavingsGoal, getSavingsGoals, softDeleteSavingsGoal, upsertSavingsGoal } from '../../db/savingsGoals';
 import { Transaction, getTransactions } from '../../db/transactions';
 import { useApp } from '../../context/AppContext';
 import AddEditAccountSheet from '../../components/AddEditAccountSheet';
+import AddEditGoalSheet from '../../components/AddEditGoalSheet';
 import EditTransactionSheet from '../../components/EditTransactionSheet';
 import { Period, getDateRange } from '../../utils/dateRanges';
 
@@ -31,21 +33,26 @@ export default function SavingsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [incomeTransactions, setIncomeTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SavingsAccount | null>(null);
+  const [goalSheetVisible, setGoalSheetVisible] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [incomePeriod, setIncomePeriod] = useState<Period>('this_month');
 
   const loadData = useCallback(async () => {
     try {
       const { dateFrom, dateTo } = getDateRange(incomePeriod);
-      const [accts, txns] = await Promise.all([
+      const [accts, goalsData, txns] = await Promise.all([
         getSavingsAccounts(),
+        getSavingsGoals(),
         getTransactions({ type: 'income', dateFrom, dateTo }),
       ]);
       setAccounts(accts);
+      setGoals(goalsData);
       setIncomeTransactions(txns);
     } finally {
       setLoading(false);
@@ -103,6 +110,24 @@ export default function SavingsScreen() {
     setSheetVisible(false);
     setEditingAccount(null);
     dispatch({ type: 'REFRESH' });
+  };
+
+  const openAddGoal = () => { setEditingGoal(null); setGoalSheetVisible(true); };
+  const openEditGoal = (g: SavingsGoal) => { setEditingGoal(g); setGoalSheetVisible(true); };
+  const handleGoalSheetClose = () => {
+    setGoalSheetVisible(false);
+    setEditingGoal(null);
+    dispatch({ type: 'REFRESH' });
+  };
+
+  const handleDeleteGoal = (g: SavingsGoal) => {
+    Alert.alert('Delete Goal', `Delete "${g.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => { await softDeleteSavingsGoal(g.id); dispatch({ type: 'REFRESH' }); },
+      },
+    ]);
   };
 
   const renderAccount = ({ item, index }: { item: SavingsAccount; index: number }) => (
@@ -176,6 +201,67 @@ export default function SavingsScreen() {
         <React.Fragment key={item.id}>{renderAccount({ item, index })}</React.Fragment>
       ))}
 
+      {/* Savings Goals section */}
+      <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
+        <Text style={styles.sectionHeader}>Savings Goals</Text>
+        <TouchableOpacity onPress={openAddGoal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name={'add-circle-outline' as IoniconName} size={22} color="#2563EB" />
+        </TouchableOpacity>
+      </View>
+
+      {goals.length === 0 && (
+        <View style={styles.inlineEmpty}>
+          <Text style={styles.inlineEmptyText}>No goals yet — tap + to add one</Text>
+        </View>
+      )}
+
+      {goals.map(goal => {
+        const linked = accounts.find(a => a.id === goal.linked_account_id);
+        const current = linked?.balance ?? 0;
+        const pct = goal.target_amount > 0 ? Math.min(current / goal.target_amount, 1) : 0;
+        const completed = current >= goal.target_amount;
+        const daysLeft = goal.target_date
+          ? Math.ceil((new Date(goal.target_date + 'T00:00:00').getTime() - Date.now()) / 86400000)
+          : null;
+        return (
+          <TouchableOpacity
+            key={goal.id} style={styles.goalCard}
+            onPress={() => openEditGoal(goal)}
+            onLongPress={() => handleDeleteGoal(goal)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.goalHeader}>
+              <Text style={styles.goalName}>{goal.name}</Text>
+              {completed && (
+                <View style={styles.completedBadge}>
+                  <Text style={styles.completedText}>✓ Completed</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.goalAmounts}>
+              {fmt(current, state.baseCurrency)} / {fmt(goal.target_amount, state.baseCurrency)}
+            </Text>
+            <View style={styles.goalTrack}>
+              <View style={[
+                styles.goalFill,
+                { width: `${pct * 100}%` as unknown as number },
+                completed && styles.goalFillComplete,
+              ]} />
+            </View>
+            <View style={styles.goalFooter}>
+              <Text style={styles.goalPct}>{Math.round(pct * 100)}%</Text>
+              {daysLeft !== null && daysLeft > 0 && (
+                <Text style={styles.goalDays}>{daysLeft} days left</Text>
+              )}
+              {daysLeft !== null && daysLeft <= 0 && !completed && (
+                <Text style={styles.goalOverdue}>Past target date</Text>
+              )}
+              {linked && <Text style={styles.goalLinked}>{linked.name}</Text>}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
       {/* Income History section */}
       <Text style={[styles.sectionHeader, { marginTop: 16 }]}>Income History</Text>
 
@@ -242,6 +328,14 @@ export default function SavingsScreen() {
         <EditTransactionSheet
           transaction={editingTx}
           onClose={() => { setEditingTx(null); dispatch({ type: 'REFRESH' }); }}
+        />
+      )}
+
+      {goalSheetVisible && (
+        <AddEditGoalSheet
+          goal={editingGoal}
+          accounts={accounts}
+          onClose={handleGoalSheetClose}
         />
       )}
     </SafeAreaView>
@@ -322,5 +416,34 @@ function makeStyles(c: typeof Colors.light) {
       elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2, shadowRadius: 4,
     },
+
+    // Savings Goals
+    sectionHeaderRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      marginHorizontal: 16, marginBottom: 8,
+    },
+    goalCard: {
+      backgroundColor: c.surface, marginHorizontal: 16, marginBottom: 10,
+      borderRadius: 12, padding: 14, borderWidth: 1, borderColor: c.border,
+    },
+    goalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    goalName: { fontSize: 15, fontWeight: '700', color: c.text, flex: 1 },
+    completedBadge: {
+      backgroundColor: '#ECFDF5', borderRadius: 8,
+      paddingHorizontal: 8, paddingVertical: 3,
+    },
+    completedText: { fontSize: 12, fontWeight: '600', color: '#059669' },
+    goalAmounts: { fontSize: 13, color: c.textSecondary, marginBottom: 8 },
+    goalTrack: {
+      height: 8, backgroundColor: c.border, borderRadius: 4,
+      overflow: 'hidden', marginBottom: 6,
+    },
+    goalFill: { height: 8, backgroundColor: '#2563EB', borderRadius: 4 },
+    goalFillComplete: { backgroundColor: '#059669' },
+    goalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    goalPct: { fontSize: 12, fontWeight: '600', color: c.textSecondary },
+    goalDays: { fontSize: 12, color: c.textSecondary },
+    goalOverdue: { fontSize: 12, color: '#F59E0B', fontWeight: '600' },
+    goalLinked: { fontSize: 11, color: c.textSecondary },
   });
 }

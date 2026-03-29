@@ -58,6 +58,14 @@ export async function softDeleteSavingsAccount(id: string): Promise<void> {
   );
 }
 
+export async function adjustAccountBalance(id: string, delta: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    'UPDATE savings_accounts SET balance = balance + ?, updated_at = ? WHERE id = ?',
+    [delta, new Date().toISOString(), id]
+  );
+}
+
 export async function updateSavingsOrder(orderedIds: string[]): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {

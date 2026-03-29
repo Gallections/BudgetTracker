@@ -38,6 +38,7 @@ const baseTx = () => ({
   notes: null as string | null,
   date: '2026-03-26',
   type: 'expense' as const,
+  source_account_id: null as string | null,
 });
 
 // ─── insertTransaction ────────────────────────────────────────────────────────
@@ -107,6 +108,25 @@ describe('insertTransaction', () => {
     await insertTransaction({ ...baseTx(), type: 'income' });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
     expect(args).toContain('income');
+  });
+
+  it('includes source_account_id column in INSERT SQL', async () => {
+    await insertTransaction(baseTx());
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('source_account_id');
+  });
+
+  it('passes null for source_account_id when not provided', async () => {
+    await insertTransaction({ ...baseTx(), source_account_id: null });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    // last param is source_account_id
+    expect(args[args.length - 1]).toBeNull();
+  });
+
+  it('passes source_account_id when provided', async () => {
+    await insertTransaction({ ...baseTx(), source_account_id: 'acct-abc' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[args.length - 1]).toBe('acct-abc');
   });
 });
 
@@ -209,6 +229,18 @@ describe('getTransactions', () => {
     await getTransactions({ search: '' });
     const sql: string = mockDb.getAllAsync.mock.calls[0][0];
     expect(sql).not.toContain('LIKE');
+  });
+
+  it('adds source_account_id IS NULL when unlinkedOnly is true', async () => {
+    await getTransactions({ unlinkedOnly: true });
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).toContain('source_account_id IS NULL');
+  });
+
+  it('does not add source_account_id filter when unlinkedOnly is false', async () => {
+    await getTransactions({ unlinkedOnly: false });
+    const sql: string = mockDb.getAllAsync.mock.calls[0][0];
+    expect(sql).not.toContain('source_account_id IS NULL');
   });
 });
 
@@ -331,5 +363,24 @@ describe('updateTransaction', () => {
     await updateTransaction({ ...txWithId(), type: 'income' });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
     expect(args).toContain('income');
+  });
+
+  it('includes source_account_id in UPDATE SQL', async () => {
+    await updateTransaction(txWithId());
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('source_account_id = ?');
+  });
+
+  it('passes null for source_account_id when not set', async () => {
+    await updateTransaction({ ...txWithId(), source_account_id: null });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    // params: amount, currency, amount_in_base, category, merchant, notes, date, type, source_account_id, id
+    expect(args[8]).toBeNull();
+  });
+
+  it('passes source_account_id when provided', async () => {
+    await updateTransaction({ ...txWithId(), source_account_id: 'acct-1' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[8]).toBe('acct-1');
   });
 });

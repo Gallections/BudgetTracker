@@ -29,6 +29,7 @@ import {
   upsertSavingsAccount,
   softDeleteSavingsAccount,
   updateSavingsOrder,
+  adjustAccountBalance,
 } from '../db/savings';
 
 const baseAccount = () => ({
@@ -205,5 +206,48 @@ describe('updateSavingsOrder', () => {
     await updateSavingsOrder(['only-one']);
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync.mock.calls[0][1]).toEqual([0, 'only-one']);
+  });
+});
+
+// ─── adjustAccountBalance ─────────────────────────────────────────────────────
+
+describe('adjustAccountBalance', () => {
+  it('calls runAsync once', async () => {
+    await adjustAccountBalance('acct-1', -50);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('SQL uses balance = balance + ?', async () => {
+    await adjustAccountBalance('acct-1', -50);
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('balance = balance + ?');
+  });
+
+  it('passes delta as first parameter', async () => {
+    await adjustAccountBalance('acct-1', -75.50);
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[0]).toBe(-75.50);
+  });
+
+  it('passes account id as last parameter', async () => {
+    await adjustAccountBalance('target-acct', 100);
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[args.length - 1]).toBe('target-acct');
+  });
+
+  it('works with positive delta (credit)', async () => {
+    await adjustAccountBalance('acct-2', +200);
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[0]).toBe(200);
+  });
+
+  it('updates updated_at to a recent ISO timestamp', async () => {
+    const before = new Date().toISOString();
+    await adjustAccountBalance('acct-1', -10);
+    const after = new Date().toISOString();
+    const args = mockDb.runAsync.mock.calls[0][1] as unknown[];
+    const updatedAt = args[1] as string;
+    expect(updatedAt >= before).toBe(true);
+    expect(updatedAt <= after).toBe(true);
   });
 });

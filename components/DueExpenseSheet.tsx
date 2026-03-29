@@ -54,6 +54,7 @@ export default function DueExpenseSheet({ expenses, baseCurrency, rates, onClose
           notes: null,
           date: today,
           type: 'expense',
+          source_account_id: null,
         });
         await markExpensePosted(id);
       }

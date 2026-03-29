@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Modal, TouchableOpacity,
   ScrollView, Alert, KeyboardAvoidingView, Platform,
@@ -11,6 +11,7 @@ import { SUPPORTED_CURRENCIES } from '../constants/currencies';
 import { useApp } from '../context/AppContext';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 import { toBaseCurrency } from '../utils/currencyConvert';
+import { getSavingsAccounts, SavingsAccount, adjustAccountBalance } from '../db/savings';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -32,6 +33,12 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
   const [notes, setNotes] = useState(transaction.notes ?? '');
   const [txType, setTxType] = useState<'income' | 'expense'>(transaction.type ?? 'expense');
   const [saving, setSaving] = useState(false);
+  const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
+  const [sourceAccountId, setSourceAccountId] = useState<string | null>(transaction.source_account_id ?? null);
+
+  useEffect(() => {
+    getSavingsAccounts().then(setAccounts);
+  }, []);
 
   const handleSave = async () => {
     const amountNum = parseFloat(amount);
@@ -41,16 +48,28 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
     }
     setSaving(true);
     try {
+      const newAmountInBase = toBaseCurrency(amountNum, currency, state.baseCurrency, rates);
+
+      // Reverse old balance deduction
+      if (transaction.type === 'expense' && transaction.source_account_id) {
+        await adjustAccountBalance(transaction.source_account_id, +transaction.amount_in_base_currency);
+      }
+      // Apply new balance deduction
+      if (txType === 'expense' && sourceAccountId) {
+        await adjustAccountBalance(sourceAccountId, -newAmountInBase);
+      }
+
       await updateTransaction({
         id: transaction.id,
         amount: amountNum,
         currency,
-        amount_in_base_currency: toBaseCurrency(amountNum, currency, state.baseCurrency, rates),
+        amount_in_base_currency: newAmountInBase,
         category,
         merchant: merchant.trim(),
         notes: notes.trim() || null,
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type: txType,
+        source_account_id: txType === 'expense' ? sourceAccountId : null,
       });
       dispatch({ type: 'REFRESH' });
       onClose();
@@ -70,6 +89,9 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
         {
           text: 'Delete', style: 'destructive',
           onPress: async () => {
+            if (transaction.type === 'expense' && transaction.source_account_id) {
+              await adjustAccountBalance(transaction.source_account_id, +transaction.amount_in_base_currency);
+            }
             await softDeleteTransaction(transaction.id);
             dispatch({ type: 'REFRESH' });
             onClose();
@@ -198,6 +220,34 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
               placeholder="Optional notes..."
             />
           </Field>
+
+          {txType === 'expense' && accounts.length > 0 && (
+            <Field label="From account">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chipRow}>
+                  <TouchableOpacity
+                    style={[styles.chip, sourceAccountId === null && styles.chipActive]}
+                    onPress={() => setSourceAccountId(null)}
+                  >
+                    <Text style={[styles.chipText, sourceAccountId === null && styles.chipTextActive]}>
+                      None
+                    </Text>
+                  </TouchableOpacity>
+                  {accounts.map(a => (
+                    <TouchableOpacity
+                      key={a.id}
+                      style={[styles.chip, sourceAccountId === a.id && styles.chipActive]}
+                      onPress={() => setSourceAccountId(a.id)}
+                    >
+                      <Text style={[styles.chipText, sourceAccountId === a.id && styles.chipTextActive]}>
+                        {a.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </Field>
+          )}
 
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name={'trash-outline' as IoniconName} size={18} color="#EF4444" />

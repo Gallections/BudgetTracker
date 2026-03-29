@@ -24,7 +24,9 @@
       "Bash(grep -r categories C:codingAppsBudgetTracker/db --include=*.ts)",
       "Bash(find /c/coding/Apps/BudgetTracker -type f -name *PRD* -o -name *prd*)",
       "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /c/coding/Apps/BudgetTracker --include=*.ts --include=*.tsx)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(find /c/coding/Apps/BudgetTracker -path */tests/* -name *savings* -type f)",
+      "Bash(find /c/coding/Apps/BudgetTracker -maxdepth 2 -name jest.config.* -o -name __mocks__ -type d)"
     ]
   }
 }

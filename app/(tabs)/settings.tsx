@@ -11,7 +11,9 @@ import { Colors } from '../../constants/colors';
 import {
   setBaseCurrency, getBudgets, setBudget, clearBudget,
   setThemePreference, getThemePreference,
+  getDefaultAccountId, setDefaultAccountId,
 } from '../../db/userSettings';
+import { getSavingsAccounts, SavingsAccount } from '../../db/savings';
 import {
   getCustomCategories, upsertCustomCategory, softDeleteCustomCategory, CustomCategory,
 } from '../../db/customCategories';
@@ -30,6 +32,8 @@ export default function SettingsScreen() {
   const [budgets, setBudgetsState] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
+  const [defaultAccountId, setDefaultAccountIdState] = useState<string | null>(null);
 
   // Category edit modal state
   const [catModalVisible, setCatModalVisible] = useState(false);
@@ -43,13 +47,17 @@ export default function SettingsScreen() {
   const [importing, setImporting] = useState(false);
 
   const loadSettings = useCallback(async () => {
-    const [stored, cats] = await Promise.all([getBudgets(), getCustomCategories()]);
+    const [stored, cats, accts, defaultId] = await Promise.all([
+      getBudgets(), getCustomCategories(), getSavingsAccounts(), getDefaultAccountId(),
+    ]);
     const asStrings: Record<string, string> = {};
     for (const [cat, val] of Object.entries(stored)) {
       asStrings[cat] = val.toString();
     }
     setBudgetsState(asStrings);
     setCustomCategories(cats);
+    setAccounts(accts);
+    setDefaultAccountIdState(defaultId);
     setLoading(false);
   }, []);
 
@@ -65,6 +73,11 @@ export default function SettingsScreen() {
   const handleSelectTheme = async (theme: ThemePreference) => {
     await setThemePreference(theme);
     dispatch({ type: 'SET_THEME', theme });
+  };
+
+  const handleSetDefaultAccount = async (id: string | null) => {
+    await setDefaultAccountId(id);
+    setDefaultAccountIdState(id);
   };
 
   const handleSaveBudgets = async () => {
@@ -245,6 +258,35 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Default Spending Account */}
+        <Text style={[styles.sectionHeader, { marginTop: 28 }]}>Default Spending Account</Text>
+        <Text style={styles.sectionSub}>
+          New expenses automatically deduct from this account. Override per transaction in the confirm sheet.
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.accountChipRow}>
+            <TouchableOpacity
+              style={[styles.accountChip, defaultAccountId === null && styles.accountChipActive]}
+              onPress={() => handleSetDefaultAccount(null)}
+            >
+              <Text style={[styles.accountChipText, defaultAccountId === null && styles.accountChipTextActive]}>
+                None
+              </Text>
+            </TouchableOpacity>
+            {accounts.map(a => (
+              <TouchableOpacity
+                key={a.id}
+                style={[styles.accountChip, defaultAccountId === a.id && styles.accountChipActive]}
+                onPress={() => handleSetDefaultAccount(a.id)}
+              >
+                <Text style={[styles.accountChipText, defaultAccountId === a.id && styles.accountChipTextActive]}>
+                  {a.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
 
         {/* Per-Category Budgets */}
         <Text style={[styles.sectionHeader, { marginTop: 28 }]}>Monthly Budgets</Text>
@@ -484,6 +526,16 @@ function makeStyles(c: typeof Colors.light) {
       justifyContent: 'center',
     },
     addCatBtnText: { fontSize: 15, fontWeight: '600', color: c.primary },
+
+    // Default spending account chips
+    accountChipRow: { flexDirection: 'row', paddingBottom: 4, gap: 8 },
+    accountChip: {
+      borderWidth: 1, borderColor: c.border, borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: c.surface,
+    },
+    accountChipActive: { backgroundColor: c.primary, borderColor: c.primary },
+    accountChipText: { fontSize: 14, fontWeight: '500', color: c.text },
+    accountChipTextActive: { color: 'white', fontWeight: '600' },
 
     // Export buttons
     exportBtn: {

@@ -13,6 +13,7 @@ export interface Transaction {
   created_at: string;
   deleted_at: string | null;
   type: 'income' | 'expense';
+  source_account_id: string | null;
 }
 
 export async function insertTransaction(
@@ -24,12 +25,12 @@ export async function insertTransaction(
   const type = tx.type ?? 'expense';
 
   await db.runAsync(
-    `INSERT INTO transactions (id, amount, currency, amount_in_base_currency, category, merchant, notes, date, created_at, deleted_at, type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
-    [id, tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, created_at, type]
+    `INSERT INTO transactions (id, amount, currency, amount_in_base_currency, category, merchant, notes, date, created_at, deleted_at, type, source_account_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    [id, tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, created_at, type, tx.source_account_id ?? null]
   );
 
-  return { ...tx, id, created_at, deleted_at: null, type };
+  return { ...tx, id, created_at, deleted_at: null, type, source_account_id: tx.source_account_id ?? null };
 }
 
 export async function getTransactions(options?: {
@@ -39,6 +40,7 @@ export async function getTransactions(options?: {
   dateTo?: string;
   type?: 'income' | 'expense';
   search?: string;
+  unlinkedOnly?: boolean;
 }): Promise<Transaction[]> {
   const db = await getDatabase();
   const conditions: string[] = ['deleted_at IS NULL'];
@@ -65,6 +67,9 @@ export async function getTransactions(options?: {
     const s = `%${options.search}%`;
     conditions.push('(merchant LIKE ? OR notes LIKE ?)');
     params.push(s, s);
+  }
+  if (options?.unlinkedOnly) {
+    conditions.push('source_account_id IS NULL');
   }
 
   const where = conditions.join(' AND ');
@@ -109,8 +114,8 @@ export async function updateTransaction(
   await db.runAsync(
     `UPDATE transactions SET
        amount = ?, currency = ?, amount_in_base_currency = ?,
-       category = ?, merchant = ?, notes = ?, date = ?, type = ?
+       category = ?, merchant = ?, notes = ?, date = ?, type = ?, source_account_id = ?
      WHERE id = ?`,
-    [tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, tx.type, tx.id]
+    [tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, tx.type, tx.source_account_id ?? null, tx.id]
   );
 }

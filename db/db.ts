@@ -46,6 +46,15 @@ async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
   } catch {
     // Column already exists — idempotent
   }
+
+  // Migration v5: track which savings account an expense was deducted from
+  try {
+    await database.execAsync(
+      `ALTER TABLE transactions ADD COLUMN source_account_id TEXT`
+    );
+  } catch {
+    // Column already exists — idempotent
+  }
 }
 
 export async function initDatabase(): Promise<void> {
@@ -113,6 +122,17 @@ export async function initDatabase(): Promise<void> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
       keywords TEXT NOT NULL DEFAULT '[]',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS savings_goals (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      target_amount REAL NOT NULL,
+      target_date TEXT,
+      linked_account_id TEXT,
+      notes TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       deleted_at TEXT
     );

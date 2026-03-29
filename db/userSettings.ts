@@ -86,3 +86,17 @@ export async function clearMerchantOverride(merchant: string): Promise<void> {
     `merchant_override_${merchant.toLowerCase().trim()}`,
   ]);
 }
+
+// ─── Default spending account ──────────────────────────────────────────────────
+
+export async function getDefaultAccountId(): Promise<string | null> {
+  return getUserSetting('default_account_id');
+}
+
+export async function setDefaultAccountId(id: string | null): Promise<void> {
+  if (id) {
+    return setUserSetting('default_account_id', id);
+  }
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM user_settings WHERE key = ?', ['default_account_id']);
+}

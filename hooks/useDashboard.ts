@@ -12,6 +12,7 @@ export interface DashboardData {
   netWorth: number;
   recentTransactions: Transaction[];
   periodTransactions: Transaction[];
+  prevPeriodTransactions: Transaction[];
   periodSpend: number;
   periodIncome: number;
   prevPeriodSpend: number;
@@ -31,6 +32,7 @@ export function useDashboard(
     netWorth: 0,
     recentTransactions: [],
     periodTransactions: [],
+    prevPeriodTransactions: [],
     periodSpend: 0,
     periodIncome: 0,
     prevPeriodSpend: 0,
@@ -47,13 +49,14 @@ export function useDashboard(
     // All-time date range for net worth calculation
     const allTimeRange = { dateFrom: '2000-01-01', dateTo: new Date().toISOString().split('T')[0] };
 
-    const [savings, expenses, recent, allIncome, allExpenseTxns, periodExpenseTxns, periodIncomeTxns, prevExpenseTxns, prevIncomeTxns, monthlyTrend] =
+    const [savings, expenses, recent, allIncome, allUnlinkedExpenseTxns, periodExpenseTxns, periodIncomeTxns, prevExpenseTxns, prevIncomeTxns, monthlyTrend] =
       await Promise.all([
         getSavingsAccounts(),
         getRegularExpenses(),
         getTransactions({ limit: 30 }),
         getTransactions({ type: 'income' }),
-        getTransactions({ type: 'expense' }),
+        // Only unlinked expenses for net worth — linked expenses already reduced account balances
+        getTransactions({ type: 'expense', unlinkedOnly: true }),
         getTransactions({ type: 'expense', dateFrom, dateTo }),
         getTransactions({ type: 'income', dateFrom, dateTo }),
         prevRange ? getTransactions({ type: 'expense', dateFrom: prevRange.dateFrom, dateTo: prevRange.dateTo }) : Promise.resolve([]),
@@ -63,10 +66,12 @@ export function useDashboard(
 
     const accountBalances = savings.reduce((sum, a) => sum + a.balance, 0);
     const totalIncome = allIncome.reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenseTxns = allExpenseTxns.reduce((sum, t) => sum + t.amount, 0);
+    const totalUnlinkedExpenses = allUnlinkedExpenseTxns.reduce((sum, t) => sum + t.amount, 0);
     const recurringAllTime = calcRecurringContribution(expenses, allTimeRange);
 
-    const netWorth = accountBalances + totalIncome - totalExpenseTxns - recurringAllTime;
+    // Account balances already reflect linked expenses (auto-decremented on save).
+    // Only subtract unlinked expenses (cash / "None" account) to avoid double-counting.
+    const netWorth = accountBalances + totalIncome - totalUnlinkedExpenses - recurringAllTime;
 
     const periodSpend =
       periodExpenseTxns.reduce((sum, t) => sum + t.amount, 0) +
@@ -89,6 +94,7 @@ export function useDashboard(
       periodTransactions: [...periodExpenseTxns, ...periodIncomeTxns].sort(
         (a, b) => b.date.localeCompare(a.date)
       ),
+      prevPeriodTransactions: [...prevExpenseTxns, ...prevIncomeTxns],
       periodSpend,
       periodIncome,
       prevPeriodSpend,
