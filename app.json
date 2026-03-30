@@ -12,7 +12,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "com.yourname.pocketledger",
+      "bundleIdentifier": "com.gallections.pocketledger",
       "supportsTablet": true,
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow PocketLedger to transcribe your voice for expense logging.",
@@ -20,7 +20,7 @@
       }
     },
     "android": {
-      "package": "com.yourname.pocketledger",
+      "package": "com.gallections.pocketledger",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -55,6 +55,6 @@
         "projectId": "3042d678-3846-41ec-b381-875779d088ac"
       }
     },
-    "owner": "bilidl"
+    "owner": "gallections"
   }
 }
