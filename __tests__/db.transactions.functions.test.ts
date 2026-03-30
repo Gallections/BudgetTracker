@@ -39,6 +39,7 @@ const baseTx = () => ({
   date: '2026-03-26',
   type: 'expense' as const,
   source_account_id: null as string | null,
+  regular_expense_id: null as string | null,
 });
 
 // ─── insertTransaction ────────────────────────────────────────────────────────
@@ -119,14 +120,32 @@ describe('insertTransaction', () => {
   it('passes null for source_account_id when not provided', async () => {
     await insertTransaction({ ...baseTx(), source_account_id: null });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
-    // last param is source_account_id
-    expect(args[args.length - 1]).toBeNull();
+    // second-to-last param is source_account_id (last is regular_expense_id)
+    expect(args[args.length - 2]).toBeNull();
   });
 
   it('passes source_account_id when provided', async () => {
     await insertTransaction({ ...baseTx(), source_account_id: 'acct-abc' });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
-    expect(args[args.length - 1]).toBe('acct-abc');
+    expect(args[args.length - 2]).toBe('acct-abc');
+  });
+
+  it('includes regular_expense_id column in INSERT SQL', async () => {
+    await insertTransaction(baseTx());
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('regular_expense_id');
+  });
+
+  it('passes null for regular_expense_id when not provided', async () => {
+    await insertTransaction({ ...baseTx(), regular_expense_id: null });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[args.length - 1]).toBeNull();
+  });
+
+  it('passes regular_expense_id when provided', async () => {
+    await insertTransaction({ ...baseTx(), regular_expense_id: 'exp-1' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[args.length - 1]).toBe('exp-1');
   });
 });
 
@@ -382,5 +401,24 @@ describe('updateTransaction', () => {
     await updateTransaction({ ...txWithId(), source_account_id: 'acct-1' });
     const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
     expect(args[8]).toBe('acct-1');
+  });
+
+  it('includes regular_expense_id in UPDATE SQL', async () => {
+    await updateTransaction(txWithId());
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('regular_expense_id = ?');
+  });
+
+  it('passes null for regular_expense_id when not set', async () => {
+    await updateTransaction({ ...txWithId(), regular_expense_id: null });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    // params: amount, currency, amount_in_base, category, merchant, notes, date, type, source_account_id, regular_expense_id, id
+    expect(args[9]).toBeNull();
+  });
+
+  it('passes regular_expense_id when provided', async () => {
+    await updateTransaction({ ...txWithId(), regular_expense_id: 'exp-42' });
+    const args: unknown[] = mockDb.runAsync.mock.calls[0][1];
+    expect(args[9]).toBe('exp-42');
   });
 });

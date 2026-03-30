@@ -149,9 +149,9 @@ describe('upsertSavingsAccount — update (with id)', () => {
 // ─── softDeleteSavingsAccount ─────────────────────────────────────────────────
 
 describe('softDeleteSavingsAccount', () => {
-  it('calls runAsync once', async () => {
+  it('calls runAsync twice (account soft-delete + transaction unlink)', async () => {
     await softDeleteSavingsAccount('some-id');
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
   });
 
   it('passes the target id to the query', async () => {
@@ -174,6 +174,24 @@ describe('softDeleteSavingsAccount', () => {
     const args = mockDb.runAsync.mock.calls[0][1] as string[];
     expect(args[0] >= before).toBe(true);
     expect(args[0] <= after).toBe(true);
+  });
+
+  it('unlinking: calls runAsync twice (account delete + transaction unlink)', async () => {
+    await softDeleteSavingsAccount('acct-1');
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('unlinking: second query NULLs source_account_id on linked transactions', async () => {
+    await softDeleteSavingsAccount('acct-1');
+    const sql: string = mockDb.runAsync.mock.calls[1][0];
+    expect(sql).toContain('source_account_id = NULL');
+    expect(sql).toContain('source_account_id = ?');
+  });
+
+  it('unlinking: passes account id to the unlink query', async () => {
+    await softDeleteSavingsAccount('acct-xyz');
+    const args: unknown[] = mockDb.runAsync.mock.calls[1][1];
+    expect(args[0]).toBe('acct-xyz');
   });
 });
 

@@ -14,6 +14,7 @@ export interface Transaction {
   deleted_at: string | null;
   type: 'income' | 'expense';
   source_account_id: string | null;
+  regular_expense_id: string | null;
 }
 
 export async function insertTransaction(
@@ -25,12 +26,12 @@ export async function insertTransaction(
   const type = tx.type ?? 'expense';
 
   await db.runAsync(
-    `INSERT INTO transactions (id, amount, currency, amount_in_base_currency, category, merchant, notes, date, created_at, deleted_at, type, source_account_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
-    [id, tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, created_at, type, tx.source_account_id ?? null]
+    `INSERT INTO transactions (id, amount, currency, amount_in_base_currency, category, merchant, notes, date, created_at, deleted_at, type, source_account_id, regular_expense_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+    [id, tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, created_at, type, tx.source_account_id ?? null, tx.regular_expense_id ?? null]
   );
 
-  return { ...tx, id, created_at, deleted_at: null, type, source_account_id: tx.source_account_id ?? null };
+  return { ...tx, id, created_at, deleted_at: null, type, source_account_id: tx.source_account_id ?? null, regular_expense_id: tx.regular_expense_id ?? null };
 }
 
 export async function getTransactions(options?: {
@@ -114,8 +115,8 @@ export async function updateTransaction(
   await db.runAsync(
     `UPDATE transactions SET
        amount = ?, currency = ?, amount_in_base_currency = ?,
-       category = ?, merchant = ?, notes = ?, date = ?, type = ?, source_account_id = ?
+       category = ?, merchant = ?, notes = ?, date = ?, type = ?, source_account_id = ?, regular_expense_id = ?
      WHERE id = ?`,
-    [tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, tx.type, tx.source_account_id ?? null, tx.id]
+    [tx.amount, tx.currency, tx.amount_in_base_currency, tx.category, tx.merchant, tx.notes ?? null, tx.date, tx.type, tx.source_account_id ?? null, tx.regular_expense_id ?? null, tx.id]
   );
 }

@@ -67,7 +67,17 @@ export function useDashboard(
     const accountBalances = savings.reduce((sum, a) => sum + a.balance, 0);
     const totalIncome = allIncome.reduce((sum, t) => sum + t.amount, 0);
     const totalUnlinkedExpenses = allUnlinkedExpenseTxns.reduce((sum, t) => sum + t.amount, 0);
-    const recurringAllTime = calcRecurringContribution(expenses, allTimeRange);
+
+    // Exclude recurring expenses that have been posted as transactions — those amounts
+    // are already captured in totalUnlinkedExpenses, so counting them again in
+    // calcRecurringContribution would double-subtract them from net worth.
+    const postedExpenseIds = new Set(
+      allUnlinkedExpenseTxns
+        .map(t => t.regular_expense_id)
+        .filter((id): id is string => id !== null)
+    );
+    const unpostedRecurring = expenses.filter(e => !postedExpenseIds.has(e.id));
+    const recurringAllTime = calcRecurringContribution(unpostedRecurring, allTimeRange);
 
     // Account balances already reflect linked expenses (auto-decremented on save).
     // Only subtract unlinked expenses (cash / "None" account) to avoid double-counting.

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BudgetTracker",
-    "slug": "BudgetTracker",
+    "name": "PocketLedger",
+    "slug": "PocketLedger",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,16 +12,25 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.yourname.pocketledger",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow PocketLedger to transcribe your voice for expense logging.",
+        "NSMicrophoneUsageDescription": "Allow PocketLedger to use the microphone for voice expense entry."
+      }
     },
     "android": {
+      "package": "com.yourname.pocketledger",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "scheme": "pocketledger",
     "web": {
@@ -39,6 +48,13 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3042d678-3846-41ec-b381-875779d088ac"
+      }
+    },
+    "owner": "bilidl"
   }
 }

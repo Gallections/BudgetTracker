@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 import { toBaseCurrency } from '../utils/currencyConvert';
 import { getSavingsAccounts, SavingsAccount, adjustAccountBalance } from '../db/savings';
+import { setMerchantOverride } from '../db/userSettings';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -22,7 +23,7 @@ interface Props {
 
 export default function EditTransactionSheet({ transaction, onClose }: Props) {
   const { state, dispatch } = useApp();
-  const { rates } = useExchangeRates(state.baseCurrency);
+  const { rates, stale: ratesStale } = useExchangeRates(state.baseCurrency);
 
   const [amount, setAmount] = useState(transaction.amount.toString());
   const [currency, setCurrency] = useState(transaction.currency);
@@ -50,6 +51,12 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
     try {
       const newAmountInBase = toBaseCurrency(amountNum, currency, state.baseCurrency, rates);
 
+      // Save merchant override if category was manually changed
+      const trimmedMerchant = merchant.trim();
+      if (trimmedMerchant && category !== transaction.category) {
+        await setMerchantOverride(trimmedMerchant, category);
+      }
+
       // Reverse old balance deduction
       if (transaction.type === 'expense' && transaction.source_account_id) {
         await adjustAccountBalance(transaction.source_account_id, +transaction.amount_in_base_currency);
@@ -70,6 +77,7 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type: txType,
         source_account_id: txType === 'expense' ? sourceAccountId : null,
+        regular_expense_id: transaction.regular_expense_id ?? null,
       });
       dispatch({ type: 'REFRESH' });
       onClose();
@@ -164,6 +172,15 @@ export default function EditTransactionSheet({ transaction, onClose }: Props) {
               </View>
             </ScrollView>
           </Field>
+
+          {ratesStale && currency !== state.baseCurrency && (
+            <View style={styles.rateWarning}>
+              <Ionicons name={'warning-outline' as IoniconName} size={14} color="#92400E" />
+              <Text style={styles.rateWarningText}>
+                Exchange rates unavailable — amount stored at 1:1
+              </Text>
+            </View>
+          )}
 
           <Field label="Category">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -312,4 +329,11 @@ const styles = StyleSheet.create({
   typeBtnIncome: { backgroundColor: '#059669', borderColor: '#059669' },
   typeBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
   typeBtnTextActive: { color: 'white' },
+  rateWarning: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FEF3C7', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 8, marginTop: 12,
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  rateWarningText: { fontSize: 12, color: '#92400E', flex: 1 },
 });

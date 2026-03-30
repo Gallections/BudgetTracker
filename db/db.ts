@@ -55,6 +55,15 @@ async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
   } catch {
     // Column already exists — idempotent
   }
+
+  // Migration v6: track which regular expense a transaction was posted from
+  try {
+    await database.execAsync(
+      `ALTER TABLE transactions ADD COLUMN regular_expense_id TEXT`
+    );
+  } catch {
+    // Column already exists — idempotent
+  }
 }
 
 export async function initDatabase(): Promise<void> {

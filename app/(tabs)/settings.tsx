@@ -394,7 +394,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         {/* App info */}
-        <Text style={styles.version}>PocketLedger · Phase 6</Text>
+        <Text style={styles.version}>PocketLedger v1.0</Text>
       </ScrollView>
 
       {/* Custom Category Modal */}

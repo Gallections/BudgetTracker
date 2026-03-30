@@ -121,6 +121,7 @@ export async function importBackup(): Promise<ImportResult> {
         date: tx.date,
         type: tx.type ?? 'expense',
         source_account_id: tx.source_account_id ?? null,
+        regular_expense_id: tx.regular_expense_id ?? null,
       });
       imported++;
     } catch {

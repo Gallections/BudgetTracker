@@ -25,7 +25,7 @@ async function loadCachedRates(
   let fetchedAt = rows[0].fetched_at;
   for (const row of rows) {
     rates[row.target_currency] = row.rate;
-    if (row.fetched_at < fetchedAt) fetchedAt = row.fetched_at; // oldest
+    if (row.fetched_at > fetchedAt) fetchedAt = row.fetched_at; // newest
   }
   return { rates, fetchedAt };
 }

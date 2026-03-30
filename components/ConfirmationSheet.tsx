@@ -27,7 +27,7 @@ interface Props {
 
 export default function ConfirmationSheet({ transcript, parsed, onClose, type = 'expense', customCategories = [] }: Props) {
   const { state, dispatch } = useApp();
-  const { rates } = useExchangeRates(state.baseCurrency);
+  const { rates, stale: ratesStale } = useExchangeRates(state.baseCurrency);
 
   const [amount, setAmount] = useState(parsed.amount?.toString() ?? '');
   const [currency, setCurrency] = useState(parsed.currency);
@@ -73,6 +73,7 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         type,
         source_account_id: type === 'expense' ? sourceAccountId : null,
+        regular_expense_id: null,
       });
       if (type === 'expense' && sourceAccountId) {
         await adjustAccountBalance(sourceAccountId, -amountInBase);
@@ -135,6 +136,15 @@ export default function ConfirmationSheet({ transcript, parsed, onClose, type = 
               </View>
             </ScrollView>
           </Field>
+
+          {ratesStale && currency !== state.baseCurrency && (
+            <View style={styles.rateWarning}>
+              <Ionicons name={'warning-outline' as IoniconName} size={14} color="#92400E" />
+              <Text style={styles.rateWarningText}>
+                Exchange rates unavailable — amount stored at 1:1
+              </Text>
+            </View>
+          )}
 
           <Field label="Category">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -270,4 +280,11 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
   chipText: { fontSize: 14, color: '#374151' },
   chipTextActive: { color: 'white', fontWeight: '600' },
+  rateWarning: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FEF3C7', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 8, marginTop: 12,
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  rateWarningText: { fontSize: 12, color: '#92400E', flex: 1 },
 });

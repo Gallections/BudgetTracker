@@ -15,6 +15,7 @@ function makeTx(overrides: Partial<Transaction> = {}): Transaction {
     deleted_at: null,
     type: 'expense',
     source_account_id: null,
+    regular_expense_id: null,
     ...overrides,
   };
 }

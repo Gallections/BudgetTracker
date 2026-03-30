@@ -52,10 +52,17 @@ export async function upsertSavingsAccount(
 
 export async function softDeleteSavingsAccount(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(
-    'UPDATE savings_accounts SET deleted_at = ? WHERE id = ?',
-    [new Date().toISOString(), id]
-  );
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'UPDATE savings_accounts SET deleted_at = ? WHERE id = ?',
+      [new Date().toISOString(), id]
+    );
+    // Unlink transactions so they remain visible in net worth calculations
+    await db.runAsync(
+      'UPDATE transactions SET source_account_id = NULL WHERE source_account_id = ?',
+      [id]
+    );
+  });
 }
 
 export async function adjustAccountBalance(id: string, delta: number): Promise<void> {
